@@ -1,4 +1,4 @@
-# CaseX — SIH REQUIREMENTS CHECKLIST
+# MediKiosk — SIH REQUIREMENTS CHECKLIST
 
 This file converts the problem requirements into implementation checkpoints.
 

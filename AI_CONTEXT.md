@@ -1,6 +1,6 @@
-# CaseX — AI PROJECT CONTEXT
+# MediKiosk — AI PROJECT CONTEXT
 
-> This file is the primary source of truth for every AI coding agent working on CaseX.
+> This file is the primary source of truth for every AI coding agent working on MediKiosk.
 > Read this file before performing any development task.
 
 ---
@@ -9,7 +9,7 @@
 
 ## Product Name
 
-CaseX
+MediKiosk
 
 ## Product Type
 
@@ -25,15 +25,15 @@ Patient Case-Taking Software.
 
 ## Core Purpose
 
-CaseX is designed to capture a patient's clinical history before physician consultation using a conversational, multimodal, multilingual interface.
+MediKiosk is designed to capture a patient's clinical history before physician consultation using a conversational, multimodal, multilingual interface.
 
 The system converts patient-provided information into a structured clinical record that can be reviewed and verified by a physician.
 
-CaseX is NOT a generic chatbot.
+MediKiosk is NOT a generic chatbot.
 
-CaseX is NOT a diagnostic system.
+MediKiosk is NOT a diagnostic system.
 
-CaseX is NOT intended to replace physicians.
+MediKiosk is NOT intended to replace physicians.
 
 The physician remains the final decision-maker.
 
@@ -420,7 +420,7 @@ The physician must remain in control.
 
 # 15. INTEROPERABILITY
 
-CaseX should represent clinical information using FHIR-compatible resources.
+MediKiosk should represent clinical information using FHIR-compatible resources.
 
 Potential resources include:
 

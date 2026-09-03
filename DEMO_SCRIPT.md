@@ -1,4 +1,4 @@
-# CaseX — SIH DEMO SCRIPT
+# MediKiosk — SIH DEMO SCRIPT
 
 This document defines the intended final demonstration.
 
@@ -8,7 +8,7 @@ Every major feature should contribute to this journey.
 
 # DEMO OBJECTIVE
 
-Demonstrate how CaseX transforms an incomplete/unstructured patient interaction into a structured, reviewable and interoperable clinical case.
+Demonstrate how MediKiosk transforms an incomplete/unstructured patient interaction into a structured, reviewable and interoperable clinical case.
 
 ---
 
@@ -16,7 +16,7 @@ Demonstrate how CaseX transforms an incomplete/unstructured patient interaction 
 
 Show:
 
-CaseX
+MediKiosk
 
 "AI-Powered Patient Case Taking"
 
@@ -66,7 +66,7 @@ Patient reports:
 
 "I have chest pain."
 
-CaseX begins the clinical interview.
+MediKiosk begins the clinical interview.
 
 The system asks relevant follow-up questions.
 
@@ -90,7 +90,7 @@ Patient provides:
 - Shortness of breath
 - Sweating
 
-CaseX extracts the symptoms.
+MediKiosk extracts the symptoms.
 
 Deterministic rule engine identifies configured potential red flag.
 
@@ -137,7 +137,7 @@ Patient has:
 
 Upload synthetic laboratory report.
 
-CaseX processes the document.
+MediKiosk processes the document.
 
 Show:
 
@@ -264,7 +264,7 @@ Do not claim live production integration unless it actually exists.
 
 End with:
 
-"CaseX doesn't replace the physician.
+"MediKiosk doesn't replace the physician.
 
 It makes sure the physician doesn't start the consultation from zero."
 

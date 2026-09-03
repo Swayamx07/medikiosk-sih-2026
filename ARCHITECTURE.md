@@ -1,4 +1,4 @@
-# CaseX — SYSTEM ARCHITECTURE
+# MediKiosk — SYSTEM ARCHITECTURE
 
 ---
 

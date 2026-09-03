@@ -1,26 +1,88 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+
+  --primary: #0f172a;
+  --primary-foreground: #ffffff;
+
+  --accent-clinical: #0284c7;
+  --accent-clinical-foreground: #ffffff;
+
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
+
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+
+  --border: #e2e8f0;
+  --input: #cbd5e1;
+
+  --ring: #0284c7;
+
+  /* Clinical Semantics */
+  --priority-alert: #dc2626;
+  --priority-alert-bg: #fef2f2;
+  --priority-alert-border: #fecaca;
+
+  --verified-safe: #16a34a;
+  --verified-safe-bg: #f0fdf4;
+  --verified-safe-border: #bbf7d0;
+
+  --pending-review: #d97706;
+  --pending-review-bg: #fffbeb;
+  --pending-review-border: #fde68a;
+
+  --radius: 0.5rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent-clinical: var(--accent-clinical);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-priority: var(--priority-alert);
+  --color-priority-bg: var(--priority-alert-bg);
+  --color-priority-border: var(--priority-alert-border);
+
+  --color-verified: var(--verified-safe);
+  --color-verified-bg: var(--verified-safe-bg);
+  --color-verified-border: var(--verified-safe-border);
+
+  --color-pending: var(--pending-review);
+  --color-pending-bg: var(--pending-review-bg);
+  --color-pending-border: var(--pending-review-border);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    border-color: var(--border);
+    box-sizing: border-box;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
 }

@@ -1,4 +1,4 @@
-# CaseX — AI AGENT RULES
+# MediKiosk — AI AGENT RULES
 
 These rules apply to every AI coding agent.
 

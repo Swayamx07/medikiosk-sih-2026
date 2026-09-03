@@ -1,4 +1,4 @@
-# CaseX — 48-HOUR DEVELOPMENT ROADMAP
+# MediKiosk — 48-HOUR DEVELOPMENT ROADMAP
 
 This roadmap controls development order.
 
@@ -191,7 +191,7 @@ Status: NOT STARTED
 
 Acceptance:
 
-The CaseX patient record can be transformed into a coherent FHIR-compatible Bundle.
+The MediKiosk patient record can be transformed into a coherent FHIR-compatible Bundle.
 
 ---
 
@@ -208,7 +208,7 @@ Status: NOT STARTED
 
 Acceptance:
 
-The architecture clearly demonstrates how CaseX could integrate with ABDM/HIS systems.
+The architecture clearly demonstrates how MediKiosk could integrate with ABDM/HIS systems.
 
 The UI must clearly distinguish prototype/mock behavior from live production integration.
 

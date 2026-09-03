@@ -1,4 +1,4 @@
-# CaseX — FEATURE PARKING LOT
+# MediKiosk — FEATURE PARKING LOT
 
 > Ideas go here instead of interrupting the active roadmap.
 

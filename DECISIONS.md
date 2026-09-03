@@ -1,4 +1,4 @@
-# CaseX — ARCHITECTURAL DECISIONS
+# MediKiosk — ARCHITECTURAL DECISIONS
 
 This document records decisions that should not be reconsidered casually.
 
@@ -8,7 +8,7 @@ This document records decisions that should not be reconsidered casually.
 
 Decision:
 
-Product name is CaseX.
+Product name is MediKiosk.
 
 Status:
 
