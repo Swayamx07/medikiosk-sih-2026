@@ -7,13 +7,13 @@
 
 # CURRENT PHASE
 
-PHASE 0 — FOUNDATION
+PHASE 1 — DATABASE & STORAGE
 
 ---
 
 # CURRENT TASK
 
-Foundation UI and application shell
+Phase 1B — Database Migration & Storage Schema Implementation (Prepared and Validated)
 
 ---
 
@@ -43,18 +43,36 @@ Foundation UI and application shell
   - `/doctor/patients/[id]` (Patient Case Review, Summary & Verification Shell)
   - `/doctor/interoperability` (FHIR R4 & ABDM Architecture Shell)
 - [x] Production build and ESLint verified (0 errors, 0 warnings across all 15 routes)
+- [x] Phase 1A Database Schema Design created and approved (`docs/PHASE_1A_DATABASE_SCHEMA.md`)
+- [x] Phase 1B Initial Supabase migration created (`supabase/migrations/20260908003600_initial_schema.sql`):
+  - 12 core tables with UUID primary keys and strict PostgreSQL check constraints
+  - Derived runtime patient age (no persisted age column)
+  - Automatic `updated_at` triggers
+  - Comprehensive foreign-key indexes and query performance indexes
+  - Private Supabase Storage bucket (`medical-documents`) configuration
+- [x] Phase 1B Comprehensive Security Audit conducted (`docs/PHASE_1B_SECURITY_REVIEW.md`)
+- [x] Phase 1B Final RLS Review & Minimum Authorization Specification completed (`docs/PHASE_1B_RLS_FINAL_REVIEW.md`)
+- [x] Phase 1B RLS Hardening migration implemented and validated (`supabase/migrations/20260908005000_harden_rls.sql`):
+  - Anonymous SELECT access revoked across all 10 sensitive clinical tables
+  - Broad `FOR ALL` anon mutation policies completely eliminated
+  - Direct client-side INSERT revoked on AI/system tables (`clinical_histories`, `medical_timeline`, `audit_logs`)
+  - Authenticated status transitions strictly whitelisted (`clinical_sessions`, `clinical_histories`, `document_extractions`, `physician_reviews`, `triage_alerts`)
+  - Direct client storage upload policies revoked (uploads mediated server-side via Server Actions using service_role)
+  - Medical record non-repudiation enforced for verified physician reviews and clinical histories
+  - Audit log append-only guarantees fortified (zero client update/delete/insert)
+- [x] Supabase CLI configuration created (`supabase/config.toml`)
 
 ---
 
 # IN PROGRESS
 
-None.
+None (Pre-execution validation complete; awaiting authorization for remote migration).
 
 ---
 
 # NEXT TASK
 
-Phase 1 — Database & Storage Setup (Supabase project connection, database schema, synthetic demo data).
+Phase 1C — Execute migration against Supabase project and prepare synthetic demo seed data.
 
 ---
 
@@ -108,7 +126,7 @@ Phase 0 Foundation UI and application shell verified locally.
 
 # ACTIVE ROADMAP PHASE
 
-PHASE 0
+PHASE 1
 
 ---
 
@@ -125,11 +143,31 @@ PHASE 0
 
 # NEXT CHECKPOINT
 
-Phase 1: Supabase database schema and storage setup.
+Phase 1C: Remote migration execution and synthetic demo seed data setup.
 
 ---
 
 # CHANGE LOG
+
+## Phase 1B — Database Migration, Security Audit & RLS Hardening (Prepared & Validated)
+- Authored initial migration in `supabase/migrations/20260908003600_initial_schema.sql` (12 core PostgreSQL tables with UUID PKs, check constraints, foreign-key indexes, triggers, and private storage bucket).
+- Created Supabase CLI configuration in `supabase/config.toml`.
+- Conducted exhaustive pre-execution security audit documented in `docs/PHASE_1B_SECURITY_REVIEW.md` (flagged 2 critical RLS issues and 3 high-risk anonymous access policies).
+- Authored and statically validated RLS hardening migration in `supabase/migrations/20260908005000_harden_rls.sql`:
+  - Revoked direct anonymous SELECT and mutation permissions across all sensitive clinical tables (`patients`, `clinical_sessions`, `consents`, `clinical_answers`, `clinical_histories`, `triage_alerts`, `documents`, `document_extractions`, `medical_timeline`).
+  - Transitioned patient intake data transactions to the Server-Mediated Kiosk Pattern (Next.js Server Actions with service role).
+  - Restricted `clinical_questions` to read-only presentation for active questions.
+  - Constrained Supabase Storage uploads to strict path hierarchy `patients/{id}/sessions/{id}/`.
+  - Implemented medical record non-repudiation for verified physician reviews and clinical histories (blocking overwrite unless explicitly amended).
+  - Maintained strictly append-only audit logging.
+
+## Phase 1A — Database Schema Design
+- Authored comprehensive architectural specification in `docs/PHASE_1A_DATABASE_SCHEMA.md`.
+- Specified 12 core tables (`patients`, `consents`, `clinical_sessions`, `clinical_questions`, `clinical_answers`, `clinical_histories`, `triage_alerts`, `documents`, `document_extractions`, `medical_timeline`, `physician_reviews`, `audit_logs`).
+- Designed private Supabase Storage architecture for medical documents.
+- Designed deterministic safety and red-flag escalation table structure.
+- Removed persisted patient age; designated runtime calculation from `date_of_birth`.
+- Formulated application-optimized relational schema with dedicated FHIR R4 transformation layer strategy.
 
 ## Phase 0 — Foundation UI and Application Shell
 - Installed minimal UI dependencies: `lucide-react`, `clsx`, `tailwind-merge`.
