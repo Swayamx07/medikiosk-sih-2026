@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, HeartPulse } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { IntakeProvider } from "@/context/IntakeContext";
 
 export default function PatientLayout({
   children,
@@ -73,7 +74,9 @@ export default function PatientLayout({
 
       {/* Main Content Area */}
       <main className="flex-1 py-8 sm:py-12">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6">{children}</div>
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <IntakeProvider>{children}</IntakeProvider>
+        </div>
       </main>
 
       {/* Footer disclaimer */}

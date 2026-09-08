@@ -1,9 +1,21 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, ShieldCheck, CheckCircle2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/Card";
+import { ArrowRight, ShieldCheck, CheckCircle2, CheckSquare, Square } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { useIntake } from "@/context/IntakeContext";
 
 export default function PatientConsentPage() {
+  const { consentGranted, setConsent } = useIntake();
+
   return (
     <div className="space-y-6">
       <div>
@@ -11,7 +23,7 @@ export default function PatientConsentPage() {
           Step 2 of 7
         </Badge>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-          Patient Consent & Privacy Notice
+          Patient Consent &amp; Privacy Notice
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           Digital health records under ABDM and clinical safety guidelines require transparent patient consent.
@@ -20,9 +32,16 @@ export default function PatientConsentPage() {
 
       <Card className="border-slate-200">
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-emerald-600" />
-            <CardTitle>Informed Consent Acknowledgement</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-emerald-600" />
+              <CardTitle>Informed Consent Acknowledgement</CardTitle>
+            </div>
+            {consentGranted && (
+              <Badge variant="success" className="text-[11px]">
+                Consent Granted ✓
+              </Badge>
+            )}
           </div>
           <CardDescription>
             Please review the statements below before beginning your intake.
@@ -45,10 +64,31 @@ export default function PatientConsentPage() {
             <div className="flex items-start gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
               <p>
-                <strong className="text-slate-800">Data Protection & Privacy:</strong> For this SIH prototype demonstration, only synthetic demo patient information is processed in accordance with privacy safeguards.
+                <strong className="text-slate-800">Data Protection &amp; Privacy:</strong> For this SIH prototype demonstration, only synthetic demo patient information is processed in accordance with privacy safeguards.
               </p>
             </div>
           </div>
+
+          {/* Interactive Consent Checkbox Toggle */}
+          <button
+            type="button"
+            onClick={() => setConsent(!consentGranted)}
+            className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
+          >
+            {consentGranted ? (
+              <CheckSquare className="h-5 w-5 text-emerald-600 shrink-0" />
+            ) : (
+              <Square className="h-5 w-5 text-slate-400 shrink-0" />
+            )}
+            <div>
+              <p className="text-xs font-semibold text-slate-800">
+                I acknowledge and grant consent for digital case-taking
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Click to acknowledge the clinical terms and authorization.
+              </p>
+            </div>
+          </button>
         </CardContent>
         <CardFooter className="flex justify-between border-t border-slate-100 pt-4">
           <Link
@@ -59,9 +99,10 @@ export default function PatientConsentPage() {
           </Link>
           <Link
             href="/patient/identify"
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-slate-800"
+            onClick={() => setConsent(true)}
+            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
           >
-            <span>I Agree &amp; Consent</span>
+            <span>{consentGranted ? "Proceed to Step 3: Identify" : "I Agree & Consent"}</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </CardFooter>
