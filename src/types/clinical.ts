@@ -77,6 +77,8 @@ export interface DraftIntakeState {
   sessionCode: string | null;
   mode: IntakeMode;
   messages: ConversationMessage[];
+  chiefComplaint?: string;
+  sessionStatus?: SessionStatus;
 }
 
 /**

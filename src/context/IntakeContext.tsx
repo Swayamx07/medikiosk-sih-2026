@@ -14,6 +14,7 @@ import {
   PatientProfile,
   ConversationMessage,
   SYNTHETIC_DEMO_CASES,
+  SessionStatus,
 } from "@/types/clinical";
 
 const STORAGE_KEY = "medikiosk_intake_draft";
@@ -29,6 +30,8 @@ const INITIAL_STATE: DraftIntakeState = {
   sessionCode: null,
   mode: "general",
   messages: [],
+  chiefComplaint: "",
+  sessionStatus: "intake_active",
 };
 
 function getInitialDraftState(): DraftIntakeState {
@@ -61,6 +64,8 @@ interface IntakeContextType extends DraftIntakeState {
   selectDemoProfile: (caseId: string) => void;
   setMode: (mode: IntakeMode) => void;
   setSession: (sessionId: string | null, sessionCode: string | null) => void;
+  setChiefComplaint: (complaint: string) => void;
+  setSessionStatus: (status: SessionStatus) => void;
   addMessage: (
     message: Omit<ConversationMessage, "id" | "timestamp">
   ) => void;
@@ -135,6 +140,14 @@ export function IntakeProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const setChiefComplaint = useCallback((chiefComplaint: string) => {
+    setState((prev) => ({ ...prev, chiefComplaint }));
+  }, []);
+
+  const setSessionStatus = useCallback((sessionStatus: SessionStatus) => {
+    setState((prev) => ({ ...prev, sessionStatus }));
+  }, []);
+
   const addMessage = useCallback(
     (msg: Omit<ConversationMessage, "id" | "timestamp">) => {
       const newMessage: ConversationMessage = {
@@ -173,6 +186,8 @@ export function IntakeProvider({ children }: { children: React.ReactNode }) {
         selectDemoProfile,
         setMode,
         setSession,
+        setChiefComplaint,
+        setSessionStatus,
         addMessage,
         clearMessages,
         resetIntake,
