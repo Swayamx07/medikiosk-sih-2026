@@ -13,7 +13,7 @@ PHASE 1 — DATABASE & STORAGE
 
 # CURRENT TASK
 
-Phase 1C — Synthetic Demo Seed Data Preparation & Insertion
+Phase 1 Complete — Awaiting Phase 2 Authorization (Voice & Multilingual Patient Intake)
 
 ---
 
@@ -66,18 +66,24 @@ Phase 1C — Synthetic Demo Seed Data Preparation & Insertion
   - Executed preflight structural and dependency validation
   - Successfully applied `20260908003600_initial_schema.sql` and `20260908005000_harden_rls.sql` via Supabase CLI
   - Confirmed remote ledger records both migrations active
+- [x] Phase 1C Synthetic demo seed data & storage fixtures deployed and verified:
+  - Generated valid synthetic PDF fixture (1,543 bytes, `lab_report_glycemic_aug2026.pdf`)
+  - Uploaded fixture to private `medical-documents` bucket at exact storage path via Supabase CLI
+  - Populated all 12 tables via `supabase/seed.sql` (3 patients, 3 sessions, 3 consents, 6 questions, 6 answers, 3 histories, 1 triage alert, 1 document, 1 extraction, 4 timeline events, 1 physician review, 11 audit logs)
+  - Verified exact row counts and storage object metadata match via read-only SQL queries
+  - Verified zero migration drift via `npx supabase db push --dry-run`
 
 ---
 
 # IN PROGRESS
 
-None (Remote migrations active; awaiting authorization for synthetic demo seed data setup).
+None (Phase 1 Database, Storage & Seed complete; awaiting Phase 2 authorization).
 
 ---
 
 # NEXT TASK
 
-Phase 1C — Prepare and seed synthetic demo patient cases into remote database.
+Phase 2 — Multilingual Voice & Patient Intake Experience (Bhashini / Web Speech API & Conversational Engine).
 
 ---
 
@@ -148,11 +154,19 @@ PHASE 1
 
 # NEXT CHECKPOINT
 
-Phase 1C: Synthetic demo seed data setup and client verification.
+Phase 2: Multilingual Voice & Patient Intake Experience (Bhashini / Web Speech API & Conversational Engine).
 
 ---
 
 # CHANGE LOG
+
+## Phase 1C — Synthetic Demo Seed & Storage Fixture Deployment (Completed)
+- Generated valid synthetic PDF fixture (`supabase/fixtures/lab_report_glycemic_aug2026.pdf`, 1,543 bytes, SHA-256: `144ecbad985ed991bae0b5b58657322f6d115c01dd9b3be52aaa10188d32b88d`).
+- Uploaded fixture to private Supabase Storage bucket (`medical-documents`) at exact path `patients/c2000000-0000-0000-0000-000000000002/sessions/c2000000-0000-0000-0000-000000000010/lab_report_glycemic_aug2026.pdf` using Supabase CLI with `--experimental` flag.
+- Executed `supabase/seed.sql` populating all 12 core tables across 3 cohesive synthetic journeys (43 total rows).
+- Verified exact row counts via read-only SQL queries: 3 patients, 3 sessions, 3 consents, 6 questions, 6 answers, 3 histories, 1 triage alert, 1 document, 1 document extraction, 4 timeline events, 1 physician review, 11 audit logs.
+- Confirmed database document metadata matches physical storage object byte-for-byte (1,543 bytes) and hash-for-hash.
+- Confirmed 0 migration drift via `npx supabase db push --dry-run`.
 
 ## Phase 1C — Remote Database Migration Execution (Completed)
 - Resolved PostgreSQL 42501 ownership error by safely removing `ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;` from `supabase/migrations/20260908003600_initial_schema.sql`.
