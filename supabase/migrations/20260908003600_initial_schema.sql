@@ -457,18 +457,12 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'objects'
     ) THEN
-        ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
         DROP POLICY IF EXISTS "physician_read_medical_documents" ON storage.objects;
         DROP POLICY IF EXISTS "kiosk_upload_medical_documents" ON storage.objects;
 
         CREATE POLICY "physician_read_medical_documents"
             ON storage.objects FOR SELECT TO authenticated
             USING (bucket_id = 'medical-documents');
-
-        CREATE POLICY "kiosk_upload_medical_documents"
-            ON storage.objects FOR INSERT TO anon, authenticated
-            WITH CHECK (bucket_id = 'medical-documents');
     END IF;
 END $$;
 

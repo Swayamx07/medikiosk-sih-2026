@@ -13,7 +13,7 @@ PHASE 1 — DATABASE & STORAGE
 
 # CURRENT TASK
 
-Phase 1B — Database Migration & Storage Schema Implementation (Prepared and Validated)
+Phase 1C — Synthetic Demo Seed Data Preparation & Insertion
 
 ---
 
@@ -61,18 +61,23 @@ Phase 1B — Database Migration & Storage Schema Implementation (Prepared and Va
   - Medical record non-repudiation enforced for verified physician reviews and clinical histories
   - Audit log append-only guarantees fortified (zero client update/delete/insert)
 - [x] Supabase CLI configuration created (`supabase/config.toml`)
+- [x] Phase 1C Remote database migration executed cleanly:
+  - Fixed PostgreSQL 42501 storage ownership requirement in initial migration
+  - Executed preflight structural and dependency validation
+  - Successfully applied `20260908003600_initial_schema.sql` and `20260908005000_harden_rls.sql` via Supabase CLI
+  - Confirmed remote ledger records both migrations active
 
 ---
 
 # IN PROGRESS
 
-None (Pre-execution validation complete; awaiting authorization for remote migration).
+None (Remote migrations active; awaiting authorization for synthetic demo seed data setup).
 
 ---
 
 # NEXT TASK
 
-Phase 1C — Execute migration against Supabase project and prepare synthetic demo seed data.
+Phase 1C — Prepare and seed synthetic demo patient cases into remote database.
 
 ---
 
@@ -102,7 +107,7 @@ Not deployed.
 
 # DATABASE STATUS
 
-Not connected.
+Connected and fully migrated (12 tables, check constraints, RLS policies, indexes, and storage bucket configured).
 
 ---
 
@@ -143,11 +148,20 @@ PHASE 1
 
 # NEXT CHECKPOINT
 
-Phase 1C: Remote migration execution and synthetic demo seed data setup.
+Phase 1C: Synthetic demo seed data setup and client verification.
 
 ---
 
 # CHANGE LOG
+
+## Phase 1C — Remote Database Migration Execution (Completed)
+- Resolved PostgreSQL 42501 ownership error by safely removing `ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;` from `supabase/migrations/20260908003600_initial_schema.sql`.
+- Completed comprehensive preflight verification across syntax, token balance, and foreign table/column references.
+- Executed `npx supabase db push --dry-run` and live `npx supabase db push --yes`.
+- Successfully deployed both migration suites to the remote Supabase project:
+  - `20260908003600_initial_schema.sql` (12 core tables, PKs, constraints, triggers, indexes, and `medical-documents` storage bucket)
+  - `20260908005000_harden_rls.sql` (hardened RLS policies, zero direct anon access to clinical data, append-only audit log)
+- Verified remote migration ledger confirms both migrations applied with exit code 0.
 
 ## Phase 1B — Database Migration, Security Audit & RLS Hardening (Prepared & Validated)
 - Authored initial migration in `supabase/migrations/20260908003600_initial_schema.sql` (12 core PostgreSQL tables with UUID PKs, check constraints, foreign-key indexes, triggers, and private storage bucket).
