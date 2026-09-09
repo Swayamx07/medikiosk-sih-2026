@@ -483,6 +483,55 @@ export default function PatientDocumentsPage() {
                   </CardHeader>
 
                   <CardContent className="pt-4 space-y-4 text-xs">
+                    {/* Patient-Document Relevance Assessment */}
+                    {extraction?.patientRelevance && (
+                      <div
+                        className={`rounded-md p-2.5 border text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
+                          extraction.patientRelevance.status === "verified"
+                            ? "border-emerald-200 bg-emerald-50/70 text-emerald-950"
+                            : extraction.patientRelevance.status === "mismatch"
+                            ? "border-rose-300 bg-rose-50/90 text-rose-950"
+                            : "border-amber-200 bg-amber-50/70 text-amber-950"
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {extraction.patientRelevance.status === "verified" ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                          ) : extraction.patientRelevance.status === "mismatch" ? (
+                            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <FileCheck className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          )}
+                          <div>
+                            <span className="font-bold block text-[11px] uppercase tracking-wider">
+                              {extraction.patientRelevance.status === "verified"
+                                ? "Patient Identity Verified ✓"
+                                : extraction.patientRelevance.status === "mismatch"
+                                ? "Patient Identity Mismatch Alert"
+                                : "Unverified Document Identity"}
+                            </span>
+                            <p className="text-[11px] opacity-90 mt-0.5">
+                              {extraction.patientRelevance.reasons[0] ||
+                                "Relevance status determined from document metadata."}
+                            </p>
+                          </div>
+                        </div>
+
+                        <Badge
+                          variant={
+                            extraction.patientRelevance.status === "verified"
+                              ? "success"
+                              : extraction.patientRelevance.status === "mismatch"
+                              ? "destructive"
+                              : "warning"
+                          }
+                          className="text-[10px] uppercase font-mono shrink-0 self-start sm:self-center"
+                        >
+                          {extraction.patientRelevance.status.replace(/_/g, " ")}
+                        </Badge>
+                      </div>
+                    )}
+
                     {/* Facility & Date Metadata */}
                     {extraction && (
                       <div className="flex flex-wrap items-center gap-4 text-slate-600 border-b border-slate-100 pb-3">

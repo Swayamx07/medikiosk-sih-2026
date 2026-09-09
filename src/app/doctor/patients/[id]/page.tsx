@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   Share2,
   Clock,
@@ -17,6 +18,7 @@ import {
   Activity,
   Pill,
   ExternalLink,
+  Sparkles,
 } from "lucide-react";
 import {
   Card,
@@ -31,6 +33,7 @@ import { Button } from "@/components/ui/Button";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { getPhysicianCaseDetailAction } from "@/app/actions/doctor";
 import { getDocumentSignedUrlAction } from "@/app/actions/documents";
+import { CanonicalJsonViewer } from "@/components/doctor/CanonicalJsonViewer";
 
 interface PatientCasePageProps {
   params: Promise<{ id: string }>;
@@ -254,6 +257,149 @@ export default async function PatientCaseDetailPage({
             </CardContent>
           </Card>
 
+          {/* Structured Conversational Clinical Findings */}
+          {caseData.structuredFindings && (
+            <Card className="border-slate-200">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-sky-600" />
+                    <CardTitle className="text-base">
+                      Patient-Reported Structured Findings
+                    </CardTitle>
+                  </div>
+                  <Badge variant="outline" className="text-xs font-mono text-sky-700 bg-sky-50 border-sky-200">
+                    Provenance Anchored
+                  </Badge>
+                </div>
+                <CardDescription>
+                  Normalized clinical entities extracted from patient dialogue, cross-referenced with exact kiosk step numbers and verbatim quotes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* HPI Summary Narrative */}
+                {caseData.structuredFindings.hpiNarrative && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-800 leading-relaxed">
+                    <span className="font-semibold text-slate-900 block mb-1 text-[11px] uppercase tracking-wider">
+                      History of Present Illness (Synthesized)
+                    </span>
+                    <p>{caseData.structuredFindings.hpiNarrative}</p>
+                  </div>
+                )}
+
+                {/* Structured Symptoms */}
+                {caseData.structuredFindings.symptoms.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
+                      Reported Symptoms ({caseData.structuredFindings.symptoms.length})
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {caseData.structuredFindings.symptoms.map((sym, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-md border border-slate-200 bg-white p-2.5 text-xs space-y-1 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900 capitalize">
+                              {sym.symptomName}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] font-mono text-slate-500">
+                              Step {sym.stepNumber}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-1 text-[11px] text-slate-600">
+                            {sym.severity && (
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-medium text-slate-700">
+                                Severity: {sym.severity}
+                              </span>
+                            )}
+                            {sym.duration && (
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-700">
+                                Duration: {sym.duration}
+                              </span>
+                            )}
+                            {sym.onset && (
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-700">
+                                Onset: {sym.onset}
+                              </span>
+                            )}
+                            {sym.location && (
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-700">
+                                Site: {sym.location}
+                              </span>
+                            )}
+                            {sym.radiation && (
+                              <span className="bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] text-amber-900 font-medium">
+                                Radiates to: {sym.radiation}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-500 italic border-t border-slate-100 pt-1 mt-1 truncate">
+                            &ldquo;{sym.sourceText}&rdquo;
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Conditions, Medications & Allergies Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100 text-xs">
+                  {/* Past Conditions */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
+                      Past Conditions
+                    </span>
+                    {caseData.structuredFindings.conditions.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 italic">None reported</p>
+                    ) : (
+                      caseData.structuredFindings.conditions.map((c, idx) => (
+                        <div key={idx} className="rounded border border-slate-200 bg-slate-50 p-1.5 text-xs">
+                          <span className="font-semibold text-slate-800 block capitalize">{c.conditionName}</span>
+                          <span className="text-[10px] text-slate-500 block truncate">Step {c.stepNumber}: &ldquo;{c.sourceText}&rdquo;</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Medications */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
+                      Current Meds
+                    </span>
+                    {caseData.structuredFindings.medications.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 italic">None reported</p>
+                    ) : (
+                      caseData.structuredFindings.medications.map((m, idx) => (
+                        <div key={idx} className="rounded border border-slate-200 bg-slate-50 p-1.5 text-xs">
+                          <span className="font-semibold text-slate-800 block capitalize">{m.medicationName}</span>
+                          <span className="text-[10px] text-slate-500 block truncate">Step {m.stepNumber}: &ldquo;{m.sourceText}&rdquo;</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Allergies */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
+                      Known Allergies
+                    </span>
+                    {caseData.structuredFindings.allergies.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 italic">None reported / NKDA</p>
+                    ) : (
+                      caseData.structuredFindings.allergies.map((a, idx) => (
+                        <div key={idx} className="rounded border border-rose-200 bg-rose-50/50 p-1.5 text-xs">
+                          <span className="font-semibold text-rose-900 block capitalize">{a.allergen}</span>
+                          <span className="text-[10px] text-rose-700 block truncate">Step {a.stepNumber}: &ldquo;{a.sourceText}&rdquo;</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Complete Chronological Intake Thread */}
           <Card className="border-slate-200">
             <CardHeader className="pb-3">
@@ -422,6 +568,66 @@ export default async function PatientCaseDetailPage({
                         </div>
                       </div>
 
+                      {/* Patient-Document Relevance Assessment Banner */}
+                      {extraction?.patientRelevance && (
+                        <div
+                          className={`rounded-md p-2.5 border text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
+                            extraction.patientRelevance.status === "verified"
+                              ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
+                              : extraction.patientRelevance.status === "mismatch"
+                              ? "border-rose-300 bg-rose-50/90 text-rose-950"
+                              : "border-amber-200 bg-amber-50/80 text-amber-950"
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            {extraction.patientRelevance.status === "verified" ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                            ) : extraction.patientRelevance.status === "mismatch" ? (
+                              <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                            ) : (
+                              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                            )}
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-[11px] uppercase tracking-wider">
+                                  {extraction.patientRelevance.status === "verified"
+                                    ? "Patient Identity Verified ✓"
+                                    : extraction.patientRelevance.status === "mismatch"
+                                    ? "Patient Identity Mismatch Alert"
+                                    : "Insufficient Header Info (Unverified Identity)"}
+                                </span>
+                                <Badge
+                                  variant={
+                                    extraction.patientRelevance.status === "verified"
+                                      ? "success"
+                                      : extraction.patientRelevance.status === "mismatch"
+                                      ? "destructive"
+                                      : "warning"
+                                  }
+                                  className="text-[10px] uppercase font-mono"
+                                >
+                                  {extraction.patientRelevance.status.replace(/_/g, " ")}
+                                </Badge>
+                              </div>
+                              <p className="text-[11px] opacity-90">
+                                {extraction.patientRelevance.reasons[0] ||
+                                  "Document patient metadata verified against encounter profile."}
+                              </p>
+                              {extraction.patientRelevance.matchedFields.length > 0 && (
+                                <p className="text-[10px] text-emerald-800">
+                                  Matched fields: {extraction.patientRelevance.matchedFields.join(", ")}
+                                </p>
+                              )}
+                              {extraction.patientRelevance.mismatchedFields.length > 0 && (
+                                <p className="text-[10px] text-rose-800 font-semibold">
+                                  Mismatched fields: {extraction.patientRelevance.mismatchedFields.join(", ")}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Extraction Header (Facility, Date, Provider, Confidence) */}
                       {extraction && (
                         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-md border border-slate-100">
@@ -584,6 +790,14 @@ export default async function PatientCaseDetailPage({
               )}
             </CardContent>
           </Card>
+
+          {/* Canonical Encounter JSON Contract */}
+          {caseData.canonicalRecord ? (
+            <CanonicalJsonViewer
+              sessionCode={caseData.sessionCode}
+              record={caseData.canonicalRecord}
+            />
+          ) : null}
         </div>
 
         {/* Right Column (1 Col): Demographics & Encounter Metadata */}

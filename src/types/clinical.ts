@@ -225,6 +225,35 @@ export interface PhysicianCaseDetail {
   history: CaseAnswerDetail[];
   documents: UploadedDocumentRecord[];
   extractions: DocumentExtractionRecord[];
+  structuredFindings?: {
+    symptoms: Array<{
+      symptomName: string;
+      onset?: string;
+      duration?: string;
+      severity?: string;
+      location?: string;
+      radiation?: string;
+      sourceText: string;
+      stepNumber: number;
+    }>;
+    conditions: Array<{
+      conditionName: string;
+      sourceText: string;
+      stepNumber: number;
+    }>;
+    medications: Array<{
+      medicationName: string;
+      sourceText: string;
+      stepNumber: number;
+    }>;
+    allergies: Array<{
+      allergen: string;
+      sourceText: string;
+      stepNumber: number;
+    }>;
+    hpiNarrative: string;
+  };
+  canonicalRecord?: CanonicalEncounterRecord | null;
   physicianReview?: {
     id: string;
     reviewStatus: string;
@@ -273,9 +302,33 @@ export interface ExtractedCondition {
   notes?: string;
 }
 
+export interface ExtractedPatientHeader {
+  patientName?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  patientIdentifier?: string | null;
+  abhaId?: string | null;
+}
+
+export type DocumentRelevanceStatus =
+  | "verified"
+  | "insufficient_info"
+  | "mismatch";
+
+export interface PatientRelevanceAssessment {
+  status: DocumentRelevanceStatus;
+  score: number; // 0.0 - 1.0
+  reasons: string[];
+  matchedFields: string[];
+  mismatchedFields: string[];
+  extractedPatient: ExtractedPatientHeader;
+}
+
 export interface DocumentExtractionPayload {
   extractedDate?: string;
   issuingFacilityOrDoctor?: string;
+  extractedPatientHeader?: ExtractedPatientHeader;
+  patientRelevance?: PatientRelevanceAssessment;
   labResults: ExtractedLabResult[];
   medications: ExtractedMedication[];
   conditions: ExtractedCondition[];
@@ -305,6 +358,8 @@ export interface DocumentExtractionRecord {
   sessionId: string;
   extractedDate?: string | null;
   issuingFacilityOrDoctor?: string | null;
+  extractedPatientHeader?: ExtractedPatientHeader | null;
+  patientRelevance?: PatientRelevanceAssessment | null;
   extractedLabResults: ExtractedLabResult[];
   extractedMedications: ExtractedMedication[];
   extractedConditions: ExtractedCondition[];
@@ -314,5 +369,152 @@ export interface DocumentExtractionRecord {
   isVerified: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Canonical Encounter Record contract (Encounter-level JSON standard)
+ */
+export interface CanonicalEncounterRecord {
+  patient: {
+    patientIdentifier: string;
+    fullName: string;
+    dateOfBirth: string;
+    gender: string;
+    phoneNumber?: string | null;
+    primaryLanguage: SupportedLanguage;
+    abhaId?: string | null;
+    isDemo: boolean;
+  };
+  encounter: {
+    sessionId: string;
+    sessionCode: string;
+    mode: IntakeMode;
+    status: SessionStatus;
+    priority: PriorityLevel;
+    startedAt: string;
+    completedAt?: string | null;
+    assignedPhysicianId?: string | null;
+  };
+  chiefComplaint: {
+    confirmed: string;
+    verbatimAudit: string;
+    language: SupportedLanguage;
+    source: "patient_reported";
+  };
+  symptoms: Array<{
+    name: string;
+    onset?: string;
+    duration?: string;
+    severity?: string;
+    location?: string;
+    radiation?: string;
+    source: "patient_reported";
+    provenance: {
+      stepNumber: number;
+      questionDomain: string;
+      verbatimQuote: string;
+    };
+  }>;
+  history: {
+    pastMedicalConditions: Array<{
+      name: string;
+      status?: string;
+      source: "patient_reported";
+      provenance: {
+        stepNumber: number;
+        verbatimQuote: string;
+      };
+    }>;
+    familyHistory: Array<{
+      relation?: string;
+      condition?: string;
+      source: "patient_reported" | "clinical_history";
+    }>;
+  };
+  medications: {
+    patientReported: Array<{
+      name: string;
+      dosage?: string;
+      frequency?: string;
+      source: "patient_reported";
+      provenance: {
+        stepNumber: number;
+        verbatimQuote: string;
+      };
+    }>;
+    documentExtracted: Array<{
+      name: string;
+      dosage?: string;
+      frequency?: string;
+      duration?: string;
+      instructions?: string;
+      sourceDocumentFilename: string;
+      source: "extracted_document";
+    }>;
+  };
+  allergies: {
+    patientReported: Array<{
+      allergen: string;
+      reaction?: string;
+      source: "patient_reported";
+      provenance: {
+        stepNumber: number;
+        verbatimQuote: string;
+      };
+    }>;
+  };
+  documents: Array<{
+    documentId: string;
+    filename: string;
+    documentType: string;
+    uploadedAt: string;
+    fileSizeBytes: number;
+    mimeType: string;
+    relevanceStatus: DocumentRelevanceStatus;
+    relevanceAssessment: PatientRelevanceAssessment;
+  }>;
+  extractedFindings: {
+    laboratoryInvestigations: Array<{
+      testName: string;
+      value: string;
+      unit?: string;
+      referenceRange?: string;
+      isAbnormal: boolean;
+      flag?: string;
+      sourceDocumentFilename: string;
+      source: "extracted_document";
+    }>;
+    documentedConditions: Array<{
+      name: string;
+      status?: string;
+      notes?: string;
+      sourceDocumentFilename: string;
+      source: "extracted_document";
+    }>;
+  };
+  triage: {
+    priority: PriorityLevel;
+    criticalRedFlag: boolean;
+    ruleId?: string;
+    reason?: string;
+    detectedSymptoms: string[];
+    evaluatedBy: "deterministic_safety_engine";
+  };
+  provenance: {
+    generatedAt: string;
+    systemVersion: string;
+    sources: {
+      patientProvided: "kiosk_q_and_a";
+      documentExtracted: "multimodal_ocr";
+      triageEvaluation: "deterministic_rules";
+      physicianVerification: "pending_review" | "verified";
+    };
+    verificationStatus: {
+      isVerifiedByPhysician: boolean;
+      verifiedAt?: string | null;
+      verifiedBy?: string | null;
+      physicianNotes?: string | null;
+    };
+  };
 }
 

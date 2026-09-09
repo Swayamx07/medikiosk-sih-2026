@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   ShieldCheck,
-  Stethoscope,
   UserCheck,
   FileCheck2,
   Cpu,
@@ -54,19 +53,20 @@ export default function Home() {
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/patient"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-lg bg-slate-900 px-6 py-3.5 text-base font-medium text-white shadow-sm hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 transition-all active:scale-[0.99]"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-lg bg-slate-900 px-8 py-4 text-base font-medium text-white shadow-sm hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 transition-all active:scale-[0.99]"
                 >
                   <UserCheck className="h-5 w-5 text-sky-400" />
                   <span>Start Patient Intake</span>
                   <ArrowRight className="h-4 w-4 ml-1" />
                 </Link>
+              </div>
 
+              <div className="mt-4 text-center">
                 <Link
-                  href="/doctor"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-base font-medium text-slate-800 shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 transition-all active:scale-[0.99]"
+                  href="/doctor/login"
+                  className="text-xs text-slate-500 hover:text-slate-800 hover:underline transition-colors"
                 >
-                  <Stethoscope className="h-5 w-5 text-slate-700" />
-                  <span>Open Physician Dashboard</span>
+                  Attending Medical Staff Portal &rarr;
                 </Link>
               </div>
 

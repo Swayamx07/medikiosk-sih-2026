@@ -7,13 +7,21 @@
 
 # CURRENT PHASE
 
-PHASE 4 & CHECKPOINT 6 COMPLETE — AWAITING PHASE 5 (DOCUMENT INGESTION)
+POST-PHASE 5 CLINICAL FOUNDATIONS COMPLETE — ALL 6 CORE AREAS IMPLEMENTED & VERIFIED
 
 ---
 
 # CURRENT TASK
 
-Phase 5 Pre-Implementation Inspection Completed — Awaiting Authorization to Implement Phase 5 (Document Ingestion & Clinical Document Processing).
+Verified All 6 Key Functional & Safety Enhancements:
+1. Physician Dashboard Access Control (Application/Routing & HMAC-SHA256 Session Cookie)
+2. Chief Complaint Quality & Validation (Non-diagnostic, multilingual, verbatim audit preserved)
+3. Document-Patient Relevance Verification (`verified`, `insufficient_info`, `mismatch`)
+4. Canonical Clinical Encounter JSON Contract (Separating patient, document, triage, & physician data)
+5. Conversational Clinical Information Structuring (Provenance-anchored symptoms, medications, allergies)
+6. Hybrid Deterministic + Gemini Fallback Architecture (Deterministic guardrails, 0 DB migrations)
+
+All 4 test suites passing (100%), TypeScript clean (0 errors), Next.js production build (`npm run build`) passing.
 
 ---
 
@@ -65,37 +73,39 @@ Phase 5 Pre-Implementation Inspection Completed — Awaiting Authorization to Im
 - [x] Idempotent duplicate alert prevention per session
 - [x] Non-diagnostic clinical advisory banner presented to patient
 
-### 5. Live Physician Workstation & Case Review (Checkpoint 6)
-- [x] Live Supabase-backed physician queue (`/doctor/patients` via `getPhysicianQueueAction`):
-  - Fetches live outpatient encounters from `clinical_sessions`, `patients`, and `triage_alerts`
-  - Real-time clinical priority queue sorting (emergency/red-flag cases top-ranked, followed by urgent, then recency)
-  - Visual badges for session code, status, priority, and critical red-flag alerts
-- [x] Live case encounter detail review (`/doctor/patients/[id]` via `getPhysicianCaseDetailAction`):
-  - Resolution by UUID session ID, session code (`CS-2026-0908-01`), or demo slug
-  - Patient demographics (name, identifier, age derived from DOB, gender, phone, ABHA ID)
-  - Prominent emergency safety alert banner showing trigger rule ID, reason, and detected symptoms
-  - Chronological Q&A audit trail displaying step number, clinical domain, kiosk prompt, verbatim patient answer, modality (`text` vs `voice_browser`), language, and timestamp
-  - Encounter metadata card (intake mode, primary language, priority, status, start/completion timestamps)
+### 5. Document Ingestion & Multimodal Processing (Phase 5)
+- [x] Client dropzone with MIME validation, 15 MB limit, SHA-256 checksums
+- [x] Server-mediated Supabase storage upload and database record creation
+- [x] Multimodal OCR and structured extraction (Gemini Vision + deterministic medical fallback)
+- [x] Extraction of lab tests, medications, diagnoses, and issuing doctor/facility metadata
 
-### 6. Phase 5 Document Infrastructure Inspection (Completed)
-- [x] Completed pre-implementation architectural inspection of existing document infrastructure:
-  - `documents` table: fully supports document metadata, checksums, status, and MIME types
-  - `document_extractions` table: fully supports structured JSONB labs, medications, and conditions
-  - `medical_timeline` & `audit_logs`: support document event sourcing
-  - Private `medical-documents` storage bucket: configured and verified
-  - Hardened RLS policies: server-mediated model confirmed; **zero database migrations or RLS changes needed**
+### 6. Physician Dashboard Access Control (Routing & Application Guard)
+- [x] Cryptographic HMAC-SHA256 session token management (`src/lib/auth/physician-session.ts`)
+- [x] Server-side routing interceptor in `src/middleware.ts` protecting `/doctor/:path*`
+- [x] Unauthorized or unauthenticated direct visits blocked and redirected to `/doctor/login?redirect=...`
+- [x] Public UI links to `/doctor` purged from patient-facing components (`Navbar`, landing page)
+- [x] Dedicated workstation portal (`/doctor/login`) with demo credentials and automated session sign-out
+- [x] Validated via `scripts/test-physician-auth.ts` (6/6 tests passed)
 
----
+### 7. Chief Complaint Quality & Multilingual Semantic Validation
+- [x] Classifier in `src/lib/clinical/cleaner.ts`: distinguishes `meaningful`, `unclear_insufficient`, and `non_clinical_gibberish`
+- [x] Strict non-diagnostic behavior (no medical diagnoses rendered)
+- [x] Supports colloquial phrasing and noisy STT transcription across English, Hindi, and Marathi
+- [x] Always preserves verbatim input in audit log while prompting patient to restate unclear/gibberish answers before confirmation
+- [x] Validated via `scripts/test-chief-complaint-validation.ts` (14/14 tests passed)
 
-# IN PROGRESS
+### 8. Document-Patient Relevance Verification
+- [x] Extracted patient header comparison engine (`evaluateDocumentPatientRelevance`)
+- [x] 3-tier classification: `verified` (identity confirmed), `insufficient_info` (lacks header), and `mismatch` (demographics conflict)
+- [x] Color-coded badges and explanatory banners on patient document portal and physician workstation
+- [x] Validated via `scripts/test-document-relevance.ts` (6/6 tests passed)
 
-None. Phase 4 and Checkpoint 6 complete and fully verified. Ready for Phase 5 implementation.
-
----
-
-# NEXT CHECKPOINT / NEXT TASK
-
-### PHASE 5 — DOCUMENT INGESTION & CLINICAL DOCUMENT PROCESSING (NOT IMPLEMENTED / NEXT CHECKPOINT)
+### 9. Provenance-Anchored Conversation Structuring & Canonical JSON Contract
+- [x] Normalized extraction of symptoms (onset, duration, severity, location, radiation), conditions, medications, allergies
+- [x] Every entity anchored to exact kiosk `stepNumber` and verbatim quote
+- [x] Encounter-level canonical JSON contract (`CanonicalEncounterRecord`) separating patient-provided, document-extracted, deterministic triage, and physician-verified data
+- [x] Interactive physician JSON viewer component (`CanonicalJsonViewer`) with syntax highlighting, one-click copy, and file export
+- [x] Validated via `scripts/test-canonical-json.ts` (38/38 tests passed across Demo Cases 1, 2, 3)
 
 **Objective**:
 Transform `/patient/documents` from a static UI shell into a functional, secure document ingestion step.

@@ -14,7 +14,19 @@ import {
   UploadedDocumentRecord,
   DocumentExtractionRecord,
   DocumentType,
+  ExtractedPatientHeader,
+  PatientRelevanceAssessment,
+  ClinicalDomain,
 } from "@/types/clinical";
+import {
+  extractStructuredConversationEntities,
+  ConversationStepInput,
+} from "@/lib/clinical/conversation-extractor";
+import {
+  buildCanonicalClinicalRecord,
+  CanonicalEncounterRecord,
+} from "@/lib/clinical/canonical-record";
+import { evaluateDocumentPatientRelevance } from "@/lib/ai/document-extractor";
 
 export interface GetPhysicianQueueResult {
   success: boolean;
@@ -340,23 +352,62 @@ export async function getPhysicianCaseDetailAction(
       .eq("session_id", session.id);
 
     const extractions: DocumentExtractionRecord[] = (rawExtractions || []).map(
-      (e) => ({
-        id: e.id,
-        documentId: e.document_id,
-        sessionId: e.session_id,
-        extractedDate: e.extracted_date,
-        issuingFacilityOrDoctor: e.issuing_facility_or_doctor,
-        extractedLabResults: e.extracted_lab_results || [],
-        extractedMedications: e.extracted_medications || [],
-        extractedConditions: e.extracted_conditions || [],
-        rawExtractedPayload: e.raw_extracted_payload || {},
-        confidenceScore: e.confidence_score ? Number(e.confidence_score) : null,
-        extractionProvider: e.extraction_provider,
-        isVerified: e.is_verified,
-        createdAt: e.created_at,
-        updatedAt: e.updated_at,
-      })
+      (e) => {
+        const rawPayload = (e.raw_extracted_payload || {}) as Record<string, unknown>;
+        const extractedHeader = (rawPayload.extractedPatientHeader ||
+          rawPayload.patientHeader ||
+          null) as ExtractedPatientHeader | null;
+
+        let relevance = (rawPayload.patientRelevance ||
+          null) as PatientRelevanceAssessment | null;
+
+        if (!relevance && patient) {
+          relevance = evaluateDocumentPatientRelevance(extractedHeader || undefined, {
+            patientIdentifier: patient.patient_identifier,
+            fullName: patient.full_name,
+            dateOfBirth: patient.date_of_birth,
+            gender: patient.gender,
+            abhaId: patient.abha_id,
+          });
+        }
+
+        return {
+          id: e.id,
+          documentId: e.document_id,
+          sessionId: e.session_id,
+          extractedDate: e.extracted_date,
+          issuingFacilityOrDoctor: e.issuing_facility_or_doctor,
+          extractedPatientHeader: extractedHeader,
+          patientRelevance: relevance,
+          extractedLabResults: e.extracted_lab_results || [],
+          extractedMedications: e.extracted_medications || [],
+          extractedConditions: e.extracted_conditions || [],
+          rawExtractedPayload: rawPayload,
+          confidenceScore: e.confidence_score ? Number(e.confidence_score) : null,
+          extractionProvider: e.extraction_provider,
+          isVerified: e.is_verified,
+          createdAt: e.created_at,
+          updatedAt: e.updated_at,
+        };
+      }
     );
+
+    // Build structured conversation entities with provenance
+    const dialogueSteps: ConversationStepInput[] = history.map((h) => ({
+      stepNumber: h.stepNumber,
+      domain: h.questionDomain as ClinicalDomain,
+      questionText: h.questionText,
+      answerText: h.answerText,
+      language: (h.languageDetected || "en") as SupportedLanguage,
+    }));
+
+    const structuredFindings = extractStructuredConversationEntities(
+      dialogueSteps,
+      session.chief_complaint_raw || undefined
+    );
+
+    // Build encounter-level canonical clinical record
+    const canonicalRecord = await buildCanonicalClinicalRecord(session.id);
 
     return {
       success: true,
@@ -391,6 +442,8 @@ export async function getPhysicianCaseDetailAction(
         history,
         documents,
         extractions,
+        structuredFindings,
+        canonicalRecord,
         physicianReview,
       },
     };
@@ -398,6 +451,23 @@ export async function getPhysicianCaseDetailAction(
     return {
       success: false,
       error: err instanceof Error ? err.message : "Internal server error",
+    };
+  }
+}
+
+/**
+ * Retrieves only the Canonical Encounter Record JSON for an encounter.
+ */
+export async function getCanonicalEncounterJsonAction(
+  sessionId: string
+): Promise<{ success: boolean; record?: CanonicalEncounterRecord | null; error?: string }> {
+  try {
+    const record = await buildCanonicalClinicalRecord(sessionId);
+    return { success: true, record };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to generate canonical record",
     };
   }
 }

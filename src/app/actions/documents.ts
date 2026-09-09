@@ -6,8 +6,13 @@ import {
   DocumentType,
   UploadedDocumentRecord,
   DocumentExtractionRecord,
+  PatientRelevanceAssessment,
+  ExtractedPatientHeader,
 } from "@/types/clinical";
-import { extractClinicalDocument } from "@/lib/ai/document-extractor";
+import {
+  extractClinicalDocument,
+  evaluateDocumentPatientRelevance,
+} from "@/lib/ai/document-extractor";
 
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -158,6 +163,12 @@ export async function uploadAndProcessDocumentAction(
               extractedDate: existingExtraction.extracted_date,
               issuingFacilityOrDoctor:
                 existingExtraction.issuing_facility_or_doctor,
+              extractedPatientHeader:
+                ((existingExtraction.raw_extracted_payload as Record<string, unknown>)
+                  ?.extractedPatientHeader as ExtractedPatientHeader) || null,
+              patientRelevance:
+                ((existingExtraction.raw_extracted_payload as Record<string, unknown>)
+                  ?.patientRelevance as PatientRelevanceAssessment) || null,
               extractedLabResults: existingExtraction.extracted_lab_results || [],
               extractedMedications:
                 existingExtraction.extracted_medications || [],
@@ -245,7 +256,25 @@ export async function uploadAndProcessDocumentAction(
 
     const payload = extractionResult.payload;
 
-    // 8. Insert Structured Output into document_extractions Table
+    // 8. Fetch active patient demographics and evaluate patient-document relevance
+    const { data: patientRecord } = await supabase
+      .from("patients")
+      .select("full_name, date_of_birth, gender, patient_identifier, abha_id")
+      .eq("id", patientId)
+      .maybeSingle();
+
+    const relevanceAssessment = evaluateDocumentPatientRelevance(
+      payload.extractedPatientHeader,
+      {
+        fullName: patientRecord?.full_name || "Unknown Patient",
+        dateOfBirth: patientRecord?.date_of_birth,
+        gender: patientRecord?.gender,
+        patientIdentifier: patientRecord?.patient_identifier,
+        abhaId: patientRecord?.abha_id,
+      }
+    );
+
+    // 9. Insert Structured Output into document_extractions Table
     const { data: extractionRecord, error: extractErr } = await supabase
       .from("document_extractions")
       .insert({
@@ -260,6 +289,8 @@ export async function uploadAndProcessDocumentAction(
           summary: payload.rawSummary,
           provider: extractionResult.provider,
           extracted_at: new Date().toISOString(),
+          extractedPatientHeader: payload.extractedPatientHeader || null,
+          patientRelevance: relevanceAssessment,
         },
         confidence_score: extractionResult.confidenceScore,
         extraction_provider: extractionResult.provider,
@@ -380,6 +411,8 @@ export async function uploadAndProcessDocumentAction(
       sessionId: extractionRecord.session_id,
       extractedDate: extractionRecord.extracted_date,
       issuingFacilityOrDoctor: extractionRecord.issuing_facility_or_doctor,
+      extractedPatientHeader: payload.extractedPatientHeader || null,
+      patientRelevance: relevanceAssessment,
       extractedLabResults: extractionRecord.extracted_lab_results || [],
       extractedMedications: extractionRecord.extracted_medications || [],
       extractedConditions: extractionRecord.extracted_conditions || [],
@@ -452,22 +485,27 @@ export async function getSessionDocumentsAction(
     }));
 
     const formattedExtractions: DocumentExtractionRecord[] = (extractions || []).map(
-      (e) => ({
-        id: e.id,
-        documentId: e.document_id,
-        sessionId: e.session_id,
-        extractedDate: e.extracted_date,
-        issuingFacilityOrDoctor: e.issuing_facility_or_doctor,
-        extractedLabResults: e.extracted_lab_results || [],
-        extractedMedications: e.extracted_medications || [],
-        extractedConditions: e.extracted_conditions || [],
-        rawExtractedPayload: e.raw_extracted_payload || {},
-        confidenceScore: e.confidence_score ? Number(e.confidence_score) : null,
-        extractionProvider: e.extraction_provider,
-        isVerified: e.is_verified,
-        createdAt: e.created_at,
-        updatedAt: e.updated_at,
-      })
+      (e) => {
+        const payloadObj = (e.raw_extracted_payload || {}) as Record<string, unknown>;
+        return {
+          id: e.id,
+          documentId: e.document_id,
+          sessionId: e.session_id,
+          extractedDate: e.extracted_date,
+          issuingFacilityOrDoctor: e.issuing_facility_or_doctor,
+          extractedPatientHeader: (payloadObj.extractedPatientHeader as ExtractedPatientHeader) || null,
+          patientRelevance: (payloadObj.patientRelevance as PatientRelevanceAssessment) || null,
+          extractedLabResults: e.extracted_lab_results || [],
+          extractedMedications: e.extracted_medications || [],
+          extractedConditions: e.extracted_conditions || [],
+          rawExtractedPayload: payloadObj,
+          confidenceScore: e.confidence_score ? Number(e.confidence_score) : null,
+          extractionProvider: e.extraction_provider,
+          isVerified: e.is_verified,
+          createdAt: e.created_at,
+          updatedAt: e.updated_at,
+        };
+      }
     );
 
     return {

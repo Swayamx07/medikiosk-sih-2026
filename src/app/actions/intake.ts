@@ -18,7 +18,10 @@ import {
   StructuredQuestionOutput,
 } from "@/lib/ai";
 import { evaluateSessionTriage } from "@/lib/clinical/triage";
-import { cleanChiefComplaint } from "@/lib/clinical/cleaner";
+import {
+  classifyAndValidateChiefComplaint,
+  ChiefComplaintCategory,
+} from "@/lib/clinical/cleaner";
 
 export interface CreateSessionInput {
   patientProfile: PatientProfile;
@@ -55,6 +58,9 @@ export interface SaveAnswerResult {
   answerId?: string;
   triageAlert?: TriageEvaluationResult;
   cleanedChiefComplaint?: string;
+  needsRestatement?: boolean;
+  restatementPrompt?: string;
+  classificationCategory?: ChiefComplaintCategory;
   error?: string;
 }
 
@@ -272,12 +278,30 @@ export async function saveClinicalAnswerAction(
       };
     }
 
-    // 3. If step 1 (chief complaint), sync structured chief complaint on clinical_sessions
+    // 3. If step 1 (chief complaint), classify and validate complaint quality
     let structuredComplaint: string | undefined = undefined;
     if (stepNumber === 1 || questionDomain === "chief_complaint") {
+      const classification = await classifyAndValidateChiefComplaint(
+        answerText.trim(),
+        language
+      );
+
+      if (!classification.isValidComplaint) {
+        // Answer is preserved in clinical_answers for audit integrity,
+        // but not confirmed as a structured chief complaint. Prompt patient to restate.
+        return {
+          success: true,
+          questionId,
+          answerId: answerData.id,
+          needsRestatement: true,
+          restatementPrompt: classification.restatePrompt,
+          classificationCategory: classification.category,
+        };
+      }
+
       structuredComplaint =
         input.confirmedChiefComplaint?.trim() ||
-        cleanChiefComplaint(answerText.trim(), language);
+        classification.normalizedComplaint;
 
       await supabase
         .from("clinical_sessions")

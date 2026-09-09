@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, UserCheck, Stethoscope } from "lucide-react";
+import { Activity, UserCheck } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 
 export function Navbar() {
@@ -29,7 +29,7 @@ export function Navbar() {
           </Badge>
         </div>
 
-        {/* Conceptual Navigation */}
+        {/* Patient Navigation */}
         <nav className="flex items-center gap-2 sm:gap-3" aria-label="Main Navigation">
           <Link
             href="/patient"
@@ -37,14 +37,6 @@ export function Navbar() {
           >
             <UserCheck className="h-4 w-4 text-sky-600" />
             <span>Patient Intake</span>
-          </Link>
-
-          <Link
-            href="/doctor"
-            className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 transition-colors"
-          >
-            <Stethoscope className="h-4 w-4 text-slate-800" />
-            <span>Physician View</span>
           </Link>
         </nav>
       </div>

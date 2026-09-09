@@ -203,6 +203,7 @@ export default function PatientInterviewPage() {
     consentGranted,
     messages,
     addMessage,
+    confirmedChiefComplaint,
     setChiefComplaint,
     setConfirmedChiefComplaint,
     setSessionStatus,
@@ -467,11 +468,17 @@ export default function PatientInterviewPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isSubmitting, isConfirmingChiefComplaint]);
 
-  // Count patient responses to determine progression
-  const patientAnswerCount = messages.filter((m) => m.sender === "patient").length;
-  const isInterviewComplete = patientAnswerCount >= langSeq.length;
-  const currentQuestionIdx = Math.min(patientAnswerCount, langSeq.length - 1);
-  const activeQuestion = langSeq[currentQuestionIdx];
+  // Count clinical steps to determine progression:
+  // Step 1 remains active until chief complaint is validated and confirmed.
+  const isChiefComplaintConfirmed = Boolean(confirmedChiefComplaint);
+  const subsequentAnswers = messages.filter(
+    (m) => m.sender === "patient" && m.questionDomain !== "chief_complaint"
+  ).length;
+  const currentStepIdx = isChiefComplaintConfirmed ? Math.min(1 + subsequentAnswers, langSeq.length) : 0;
+  const patientAnswerCount = currentStepIdx;
+  const isInterviewComplete = currentStepIdx >= langSeq.length;
+  const activeQuestionIdx = Math.min(currentStepIdx, langSeq.length - 1);
+  const activeQuestion = langSeq[activeQuestionIdx];
 
   // Submit Answer handler
   const handleSendAnswer = async (e?: React.FormEvent) => {
@@ -495,8 +502,8 @@ export default function PatientInterviewPage() {
     setErrorMsg(null);
     setIsSubmitting(true);
 
-    const stepNum = patientAnswerCount + 1;
-    const targetQ = langSeq[patientAnswerCount];
+    const stepNum = activeQuestionIdx + 1;
+    const targetQ = langSeq[activeQuestionIdx];
     const answerModality = usedVoiceForCurrentAnswer ? "voice_browser" : "text";
 
     // 1. Persist to Supabase BEFORE advancing state
@@ -535,8 +542,23 @@ export default function PatientInterviewPage() {
     });
     setInputVal("");
 
-    // CRITICAL: Chief Complaint Confirmation must happen BEFORE advancing from Q1 to Q2
-    if (stepNum === 1) {
+    // CRITICAL: Chief Complaint Validation & Confirmation
+    if (targetQ.domain === "chief_complaint") {
+      if (result.needsRestatement) {
+        // Patient provided unclear or gibberish input. Prompt them to restate and remain on Step 1.
+        addMessage({
+          sender: "ai",
+          text:
+            result.restatementPrompt ||
+            "Please describe your primary symptoms or the health issue that brought you to the clinic today.",
+          questionDomain: "chief_complaint",
+        });
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 100);
+        return;
+      }
+
       const normalizedComplaint =
         result.cleanedChiefComplaint || cleanChiefComplaint(trimmed, selectedLanguage);
       setProposedChiefComplaint(normalizedComplaint);
