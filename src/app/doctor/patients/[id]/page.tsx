@@ -12,6 +12,11 @@ import {
   ShieldAlert,
   Globe,
   Stethoscope,
+  Building2,
+  Calendar,
+  Activity,
+  Pill,
+  ExternalLink,
 } from "lucide-react";
 import {
   Card,
@@ -25,6 +30,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { getPhysicianCaseDetailAction } from "@/app/actions/doctor";
+import { getDocumentSignedUrlAction } from "@/app/actions/documents";
 
 interface PatientCasePageProps {
   params: Promise<{ id: string }>;
@@ -96,6 +102,17 @@ export default async function PatientCaseDetailPage({
   const caseData = result.caseDetail;
   const isEmergency =
     caseData.priority === "emergency" || caseData.hasCriticalRedFlag;
+
+  // Resolve signed URLs for uploaded medical records
+  const signedUrls: Record<string, string> = {};
+  for (const doc of caseData.documents) {
+    if (doc.storagePath) {
+      const urlRes = await getDocumentSignedUrlAction(doc.storagePath);
+      if (urlRes.success && urlRes.signedUrl) {
+        signedUrls[doc.id] = urlRes.signedUrl;
+      }
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -214,10 +231,26 @@ export default async function PatientCaseDetailPage({
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3.5 text-slate-800 text-sm leading-relaxed italic">
-                &ldquo;{caseData.chiefComplaint}&rdquo;
+            <CardContent className="space-y-3">
+              <div>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">
+                  Structured Chief Complaint (Confirmed)
+                </span>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-slate-900 text-sm font-medium leading-relaxed">
+                  &ldquo;{caseData.chiefComplaint}&rdquo;
+                </div>
               </div>
+
+              {caseData.chiefComplaintVerbatim && caseData.chiefComplaintVerbatim !== caseData.chiefComplaint && (
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1">
+                    Verbatim Patient Response (Audit Record)
+                  </span>
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-white p-2.5 text-slate-600 text-xs leading-relaxed italic">
+                    &ldquo;{caseData.chiefComplaintVerbatim}&rdquo;
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -299,6 +332,255 @@ export default async function PatientCaseDetailPage({
                     </div>
                   </div>
                 ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Clinical Documents & Extracted Structured Findings (Phase 5) */}
+          <Card className="border-slate-200">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-sky-600" />
+                  <CardTitle className="text-base">
+                    Uploaded Medical Documents &amp; Structured Findings
+                  </CardTitle>
+                </div>
+                <Badge variant="outline" className="text-xs font-mono text-slate-600">
+                  {caseData.documents.length} File(s)
+                </Badge>
+              </div>
+              <CardDescription>
+                Historical laboratory tests, prescriptions, and summaries digitized via server-side AI.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {caseData.documents.length === 0 ? (
+                <div className="rounded-md border border-dashed border-slate-200 p-6 text-center text-slate-500 bg-slate-50/50">
+                  <FileText className="h-6 w-6 text-slate-400 mx-auto mb-2" />
+                  <p className="text-xs font-medium text-slate-700">
+                    No medical records uploaded for this encounter.
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Patient completed intake without attaching external lab reports or prescriptions.
+                  </p>
+                </div>
+              ) : (
+                caseData.documents.map((doc) => {
+                  const extraction = caseData.extractions.find(
+                    (e) => e.documentId === doc.id
+                  );
+                  const signedUrl = signedUrls[doc.id];
+
+                  return (
+                    <div
+                      key={doc.id}
+                      className="rounded-lg border border-slate-200 bg-white p-4 space-y-3.5 shadow-2xs"
+                    >
+                      {/* Document Meta Row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-slate-100 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-900">
+                            {doc.originalFilename}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] uppercase font-semibold text-slate-600"
+                          >
+                            {doc.documentType.replace(/_/g, " ")}
+                          </Badge>
+                          <Badge
+                            variant={
+                              doc.processingStatus === "completed"
+                                ? "success"
+                                : doc.processingStatus === "failed"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                            className="text-[10px] capitalize"
+                          >
+                            {doc.processingStatus}
+                          </Badge>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] text-slate-400">
+                            {(doc.fileSizeBytes / 1024).toFixed(1)} KB &bull;{" "}
+                            {formatDateTime(doc.uploadedAt)}
+                          </span>
+                          {signedUrl && (
+                            <a
+                              href={signedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 shadow-2xs"
+                            >
+                              <ExternalLink className="h-3 w-3 text-slate-500" />
+                              <span>View File</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Extraction Header (Facility, Date, Provider, Confidence) */}
+                      {extraction && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-md border border-slate-100">
+                          <div className="flex items-center gap-4 flex-wrap">
+                            {extraction.issuingFacilityOrDoctor && (
+                              <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                                <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                                <span>{extraction.issuingFacilityOrDoctor}</span>
+                              </div>
+                            )}
+                            {extraction.extractedDate && (
+                              <div className="flex items-center gap-1.5 text-slate-500">
+                                <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                                <span>Report Date: {extraction.extractedDate}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-mono text-slate-600 border-slate-200"
+                            >
+                              Provider: {extraction.extractionProvider}
+                            </Badge>
+                            {typeof extraction.confidenceScore === "number" && (
+                              <span className="text-[11px] font-medium text-slate-600">
+                                Confidence: {(extraction.confidenceScore * 100).toFixed(0)}%
+                              </span>
+                            )}
+                            <Badge
+                              variant={extraction.isVerified ? "success" : "secondary"}
+                              className="text-[10px]"
+                            >
+                              {extraction.isVerified ? "Verified ✓" : "Unverified"}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Extracted Labs Table */}
+                      {extraction && extraction.extractedLabResults.length > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                            <Activity className="h-3.5 w-3.5 text-sky-600" />
+                            <span>Extracted Laboratory Investigations</span>
+                          </div>
+                          <div className="rounded-md border border-slate-200 overflow-hidden">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-[11px]">
+                                <tr>
+                                  <th className="p-2">Investigation</th>
+                                  <th className="p-2">Observed Value</th>
+                                  <th className="p-2">Reference Range</th>
+                                  <th className="p-2 text-right">Flag</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-[11px]">
+                                {extraction.extractedLabResults.map((lab, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-50/50">
+                                    <td className="p-2 font-medium text-slate-800">
+                                      {lab.testName}
+                                    </td>
+                                    <td className="p-2 font-mono font-semibold text-slate-900">
+                                      {lab.value} {lab.unit || ""}
+                                    </td>
+                                    <td className="p-2 text-slate-500">
+                                      {lab.referenceRange || "Standard"}
+                                    </td>
+                                    <td className="p-2 text-right">
+                                      {lab.isAbnormal ? (
+                                        <Badge
+                                          variant="destructive"
+                                          className="text-[10px]"
+                                        >
+                                          {lab.flag?.toUpperCase() || "ABNORMAL"}
+                                        </Badge>
+                                      ) : (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[10px] text-emerald-700 border-emerald-300 bg-emerald-50"
+                                        >
+                                          NORMAL
+                                        </Badge>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Extracted Medications */}
+                      {extraction && extraction.extractedMedications.length > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                            <Pill className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>Extracted Medications &amp; Dosage</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {extraction.extractedMedications.map((med, idx) => (
+                              <div
+                                key={idx}
+                                className="rounded-md border border-slate-200 bg-slate-50/50 p-2.5 text-xs space-y-0.5"
+                              >
+                                <p className="font-semibold text-slate-900">{med.name}</p>
+                                <p className="text-[11px] text-slate-600">
+                                  {med.dosage || "Standard Dose"} &bull;{" "}
+                                  {med.frequency || "Daily"}{" "}
+                                  {med.duration ? `(${med.duration})` : ""}
+                                </p>
+                                {med.instructions && (
+                                  <p className="text-[10px] text-slate-500 italic">
+                                    {med.instructions}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Extracted Conditions */}
+                      {extraction && extraction.extractedConditions.length > 0 && (
+                        <div className="space-y-1.5">
+                          <span className="text-xs font-semibold text-slate-800 block">
+                            Documented Clinical Impressions / Conditions
+                          </span>
+                          <div className="space-y-1">
+                            {extraction.extractedConditions.map((cond, idx) => (
+                              <div
+                                key={idx}
+                                className="rounded-md border border-slate-200/80 bg-slate-50/30 p-2 text-xs"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-slate-800">
+                                    {cond.name}
+                                  </span>
+                                  {cond.status && (
+                                    <Badge variant="outline" className="text-[10px] capitalize">
+                                      {cond.status.replace(/_/g, " ")}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {cond.notes && (
+                                  <p className="text-[11px] text-slate-500 mt-0.5">
+                                    {cond.notes}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </CardContent>
           </Card>

@@ -1,14 +1,33 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, Globe, Shield, User, Stethoscope } from "lucide-react";
+import { useEffect } from "react";
+import { ArrowRight, Globe, Shield, User, Stethoscope, RefreshCw, PlayCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { useIntake } from "@/context/IntakeContext";
 
 export default function PatientPortalPage() {
+  const { sessionId, sessionCode, sessionStatus, startNewEncounter } = useIntake();
+
+  // If stored session belongs to completed/closed encounter, clear encounter-scoped state
+  useEffect(() => {
+    if (sessionStatus === "ready_for_review" || sessionStatus === "verified") {
+      startNewEncounter({ keepPatientProfile: false });
+    }
+  }, [sessionStatus, startNewEncounter]);
+
+  const hasUnfinishedSession =
+    Boolean(sessionId) &&
+    sessionStatus !== "ready_for_review" &&
+    sessionStatus !== "verified";
+
   return (
     <div className="space-y-6">
       <div>
         <Badge variant="outline" className="mb-2 border-sky-300 bg-sky-50 text-sky-800">
-          Phase 0 Application Shell
+          SIH MediKiosk
         </Badge>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
           Welcome to Patient Case-Taking
@@ -17,6 +36,40 @@ export default function PatientPortalPage() {
           MediKiosk will assist you in capturing your symptoms, health history, and medical documents before meeting your physician.
         </p>
       </div>
+
+      {hasUnfinishedSession && (
+        <div className="rounded-xl border-2 border-sky-300 bg-sky-50/70 p-4 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <PlayCircle className="h-5 w-5 text-sky-600" />
+              <h4 className="text-sm font-bold text-slate-900">
+                In-Progress Intake Session Detected
+              </h4>
+            </div>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Encounter {sessionCode || sessionId?.substring(0, 8)} is currently active.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => startNewEncounter({ keepPatientProfile: false })}
+              className="text-xs gap-1.5"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span>Start Fresh Visit</span>
+            </Button>
+            <Link
+              href="/patient/interview"
+              className="inline-flex items-center gap-1.5 rounded-md bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800 shadow-xs"
+            >
+              <span>Resume Intake &rarr;</span>
+            </Link>
+          </div>
+        </div>
+      )}
 
       <Card className="border-slate-200">
         <CardHeader>
@@ -38,7 +91,7 @@ export default function PatientPortalPage() {
             <Shield className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
             <div>
               <h4 className="text-sm font-semibold text-slate-900">Informed Consent</h4>
-              <p className="text-xs text-slate-500">Transparent permission for AI-assisted symptom intake and record structuring.</p>
+              <p className="text-xs text-slate-500">Explicit consent required for every encounter. Never pre-granted.</p>
             </div>
           </div>
 
@@ -46,7 +99,7 @@ export default function PatientPortalPage() {
             <User className="h-5 w-5 text-slate-700 shrink-0 mt-0.5" />
             <div>
               <h4 className="text-sm font-semibold text-slate-900">Patient Identification</h4>
-              <p className="text-xs text-slate-500">Synthetic demographic registration or quick demo profile selection.</p>
+              <p className="text-xs text-slate-500">Patient identity is preserved across multiple clinical visits.</p>
             </div>
           </div>
 
@@ -54,7 +107,7 @@ export default function PatientPortalPage() {
             <Stethoscope className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
             <div>
               <h4 className="text-sm font-semibold text-slate-900">Clinical Mode & Interview</h4>
-              <p className="text-xs text-slate-500">Conversational clinical history taking (Allopathy / AYUSH) with red-flag detection.</p>
+              <p className="text-xs text-slate-500">Conversational intake with chief complaint verification & deterministic safety triage.</p>
             </div>
           </div>
         </CardContent>

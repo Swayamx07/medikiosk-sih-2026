@@ -13,10 +13,12 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { useIntake } from "@/context/IntakeContext";
+import { PATIENT_I18N } from "@/lib/clinical/i18n";
 import { cn } from "@/lib/utils";
 
 export default function PatientIdentifyPage() {
-  const { patientProfile, setPatientProfile, selectDemoProfile } = useIntake();
+  const { patientProfile, setPatientProfile, selectDemoProfile, selectedLanguage } = useIntake();
+  const i18n = PATIENT_I18N[selectedLanguage] || PATIENT_I18N.en;
 
   const demoCases = [
     {
@@ -37,13 +39,13 @@ export default function PatientIdentifyPage() {
     <div className="space-y-6">
       <div>
         <Badge variant="outline" className="mb-2 text-sky-800 border-sky-300 bg-sky-50">
-          Step 3 of 7
+          {i18n.steps.step3}
         </Badge>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-          Patient Identification
+          {i18n.identify.title}
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Identify using synthetic demo profiles or provide minimal patient details.
+          {i18n.identify.subtitle}
         </p>
       </div>
 
@@ -51,17 +53,17 @@ export default function PatientIdentifyPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-sky-600" />
-            <CardTitle>Synthetic Intake Identification</CardTitle>
+            <CardTitle>{i18n.identify.cardTitle}</CardTitle>
           </div>
           <CardDescription>
-            In compliance with medical privacy rules, only synthetic demo patient profiles are processed.
+            {i18n.identify.cardDesc}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Demo Profile Selector Chips */}
           <div className="space-y-2">
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Select Demo Scenario Profile
+              {i18n.identify.demoLabel}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {demoCases.map((c) => {
@@ -100,13 +102,13 @@ export default function PatientIdentifyPage() {
           {/* Demographic Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
             <Input
-              label="Full Name"
+              label={i18n.identify.fullNameLabel}
               placeholder="e.g. Ramesh Kumar"
               value={patientProfile.fullName}
               onChange={(e) => setPatientProfile({ fullName: e.target.value })}
             />
             <Input
-              label="Identifier / ABHA"
+              label={i18n.identify.identifierLabel}
               placeholder="e.g. 91-4521-8832-1094"
               value={patientProfile.abhaId || patientProfile.patientIdentifier}
               onChange={(e) => setPatientProfile({ abhaId: e.target.value })}
@@ -116,7 +118,7 @@ export default function PatientIdentifyPage() {
           <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3.5 text-xs text-slate-600">
             <div className="flex items-center gap-2 font-semibold text-slate-800 mb-1">
               <FileBadge className="h-4 w-4 text-sky-600" />
-              <span>Synthetic Patient Verified: {patientProfile.patientIdentifier}</span>
+              <span>{i18n.identify.verifiedBadge}: {patientProfile.patientIdentifier}</span>
             </div>
             <p className="text-slate-500">
               Demo case: <span className="font-medium text-slate-700">{patientProfile.fullName}</span> (DOB: {patientProfile.dateOfBirth}, Gender: {patientProfile.gender}).
@@ -128,13 +130,13 @@ export default function PatientIdentifyPage() {
             href="/patient/consent"
             className="text-sm font-medium text-slate-600 hover:text-slate-900"
           >
-            &larr; Back to Consent
+            &larr; {i18n.navigation.back}
           </Link>
           <Link
             href="/patient/mode"
             className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
           >
-            <span>Proceed to Step 4: Mode</span>
+            <span>{i18n.navigation.proceed}</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </CardFooter>

@@ -14,6 +14,8 @@ import {
   Mic,
   MicOff,
   AlertTriangle,
+  Edit3,
+  Check,
 } from "lucide-react";
 import {
   Card,
@@ -35,7 +37,10 @@ import {
   updateClinicalSessionStatusAction,
   getSessionHistoryAction,
   generateNextQuestionAction,
+  confirmChiefComplaintAction,
 } from "@/app/actions/intake";
+import { cleanChiefComplaint } from "@/lib/clinical/cleaner";
+import { PATIENT_I18N } from "@/lib/clinical/i18n";
 import { ClinicalDomain, SupportedLanguage, TriageEvaluationResult } from "@/types/clinical";
 
 const QUESTION_SEQUENCE: Record<
@@ -199,8 +204,11 @@ export default function PatientInterviewPage() {
     messages,
     addMessage,
     setChiefComplaint,
+    setConfirmedChiefComplaint,
     setSessionStatus,
   } = useIntake();
+
+  const i18n = PATIENT_I18N[selectedLanguage] || PATIENT_I18N.en;
 
   const [inputVal, setInputVal] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
@@ -209,6 +217,12 @@ export default function PatientInterviewPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [triageNotice, setTriageNotice] = useState<TriageEvaluationResult | null>(null);
 
+  // Chief Complaint Confirmation State
+  const [isConfirmingChiefComplaint, setIsConfirmingChiefComplaint] = useState(false);
+  const [proposedChiefComplaint, setProposedChiefComplaint] = useState("");
+  const [isEditingConfirmation, setIsEditingConfirmation] = useState(false);
+  const [isSubmittingConfirmation, setIsSubmittingConfirmation] = useState(false);
+
   // Web Speech API Voice States
   const [isListening, setIsListening] = useState(false);
   const [speechError, setSpeechError] = useState<string | null>(null);
@@ -216,6 +230,7 @@ export default function PatientInterviewPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const confirmInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const baseInputTextRef = useRef<string>("");
 
@@ -244,7 +259,7 @@ export default function PatientInterviewPage() {
     setIsListening(false);
   };
 
-  const startSpeechRecognition = () => {
+  const startSpeechRecognition = (isConfirmEdit: boolean = false) => {
     const SpeechCtor = getSpeechRecognitionConstructor();
     if (!SpeechCtor) {
       setSpeechError(
@@ -264,12 +279,16 @@ export default function PatientInterviewPage() {
       recognition.interimResults = true;
 
       // Preserve existing text in input box
-      baseInputTextRef.current = inputVal.trim();
+      baseInputTextRef.current = isConfirmEdit
+        ? proposedChiefComplaint.trim()
+        : inputVal.trim();
 
       recognition.onstart = () => {
         setIsListening(true);
         setSpeechError(null);
-        setUsedVoiceForCurrentAnswer(true);
+        if (!isConfirmEdit) {
+          setUsedVoiceForCurrentAnswer(true);
+        }
       };
 
       recognition.onresult = (event: ISpeechRecognitionEvent) => {
@@ -281,7 +300,12 @@ export default function PatientInterviewPage() {
         const trimmed = transcript.trim();
         const base = baseInputTextRef.current;
         const combined = base ? `${base} ${trimmed}` : trimmed;
-        setInputVal(combined);
+
+        if (isConfirmEdit) {
+          setProposedChiefComplaint(combined);
+        } else {
+          setInputVal(combined);
+        }
       };
 
       recognition.onerror = (event: ISpeechRecognitionErrorEvent) => {
@@ -306,7 +330,11 @@ export default function PatientInterviewPage() {
 
       recognition.onend = () => {
         setIsListening(false);
-        inputRef.current?.focus();
+        if (isConfirmEdit) {
+          confirmInputRef.current?.focus();
+        } else {
+          inputRef.current?.focus();
+        }
       };
 
       recognition.start();
@@ -320,11 +348,11 @@ export default function PatientInterviewPage() {
     }
   };
 
-  const toggleSpeechRecognition = () => {
+  const toggleSpeechRecognition = (isConfirmEdit: boolean = false) => {
     if (isListening) {
       stopSpeechRecognition();
     } else {
-      startSpeechRecognition();
+      startSpeechRecognition(isConfirmEdit);
     }
   };
 
@@ -384,6 +412,7 @@ export default function PatientInterviewPage() {
 
           if (historyRes.chiefComplaint) {
             setChiefComplaint(historyRes.chiefComplaint);
+            setConfirmedChiefComplaint(historyRes.chiefComplaint);
           }
 
           if (historyRes.triageAlert?.triggered) {
@@ -419,6 +448,7 @@ export default function PatientInterviewPage() {
     setSession,
     addMessage,
     setChiefComplaint,
+    setConfirmedChiefComplaint,
   ]);
 
   // 2. Present first question if messages thread is brand new
@@ -435,7 +465,7 @@ export default function PatientInterviewPage() {
   // 3. Auto-scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isSubmitting]);
+  }, [messages, isSubmitting, isConfirmingChiefComplaint]);
 
   // Count patient responses to determine progression
   const patientAnswerCount = messages.filter((m) => m.sender === "patient").length;
@@ -443,10 +473,10 @@ export default function PatientInterviewPage() {
   const currentQuestionIdx = Math.min(patientAnswerCount, langSeq.length - 1);
   const activeQuestion = langSeq[currentQuestionIdx];
 
-  // Submit Answer handler with strict error/retry guards
+  // Submit Answer handler
   const handleSendAnswer = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (isSubmitting || isInitializing) return;
+    if (isSubmitting || isInitializing || isConfirmingChiefComplaint) return;
 
     if (isListening) {
       stopSpeechRecognition();
@@ -486,7 +516,6 @@ export default function PatientInterviewPage() {
     // 2. Reliability guard: Never advance if database save fails
     if (!result.success) {
       setErrorMsg(result.error || "Failed to save answer to clinical record. Please try again.");
-      // Keep inputVal in the box so patient doesn't lose what they typed
       return;
     }
 
@@ -498,7 +527,7 @@ export default function PatientInterviewPage() {
       setTriageNotice(result.triageAlert);
     }
 
-    // 3. On successful persistence, update conversation history
+    // 3. On successful persistence, update conversation history with exact verbatim response
     addMessage({
       sender: "patient",
       text: trimmed,
@@ -506,11 +535,17 @@ export default function PatientInterviewPage() {
     });
     setInputVal("");
 
+    // CRITICAL: Chief Complaint Confirmation must happen BEFORE advancing from Q1 to Q2
     if (stepNum === 1) {
-      setChiefComplaint(trimmed);
+      const normalizedComplaint =
+        result.cleanedChiefComplaint || cleanChiefComplaint(trimmed, selectedLanguage);
+      setProposedChiefComplaint(normalizedComplaint);
+      setIsConfirmingChiefComplaint(true);
+      setIsEditingConfirmation(false);
+      return;
     }
 
-    // 4. Advance to the next question via AI adapter (or safety fallback)
+    // 4. Advance to the next question for Q2, Q3, Q4
     const nextIdx = patientAnswerCount + 1;
     if (nextIdx < langSeq.length) {
       const fallbackQ = langSeq[nextIdx];
@@ -574,6 +609,84 @@ export default function PatientInterviewPage() {
     }, 100);
   };
 
+  // Chief Complaint Confirmation handler
+  const handleConfirmChiefComplaint = async () => {
+    if (isListening) {
+      stopSpeechRecognition();
+    }
+
+    const finalComplaint = proposedChiefComplaint.trim();
+    if (!finalComplaint || !sessionId) return;
+
+    setIsSubmittingConfirmation(true);
+    setErrorMsg(null);
+
+    const updateRes = await confirmChiefComplaintAction({
+      sessionId,
+      confirmedComplaint: finalComplaint,
+    });
+
+    setIsSubmittingConfirmation(false);
+
+    if (!updateRes.success) {
+      setErrorMsg(updateRes.error || "Failed to confirm chief complaint. Please try again.");
+      return;
+    }
+
+    // Persist in context
+    setConfirmedChiefComplaint(finalComplaint);
+    setChiefComplaint(finalComplaint);
+    setIsConfirmingChiefComplaint(false);
+    setIsEditingConfirmation(false);
+
+    // NOW advance to Question 2!
+    const nextIdx = 1;
+    if (nextIdx < langSeq.length) {
+      const fallbackQ = langSeq[nextIdx];
+      let nextQuestionText = fallbackQ.text;
+      let nextDomain = fallbackQ.domain;
+
+      try {
+        const prevDialogue = [
+          {
+            questionDomain: langSeq[0].domain,
+            questionText: langSeq[0].text,
+            answerText: finalComplaint,
+          },
+        ];
+
+        const aiRes = await generateNextQuestionAction({
+          language: selectedLanguage,
+          clinicalDomain: fallbackQ.domain,
+          previousAnswers: prevDialogue,
+          currentPatientAnswer: finalComplaint,
+          patientProfile: {
+            fullName: patientProfile.fullName,
+            gender: patientProfile.gender,
+            dateOfBirth: patientProfile.dateOfBirth,
+          },
+        });
+
+        if (aiRes.success && aiRes.question?.questionText) {
+          nextQuestionText = aiRes.question.questionText;
+          nextDomain = aiRes.question.clinicalDomain || fallbackQ.domain;
+        }
+      } catch (err) {
+        console.warn("AI generation failed, using safety question:", err);
+      }
+
+      addMessage({
+        sender: "ai",
+        text: nextQuestionText,
+        questionDomain: nextDomain,
+      });
+    }
+
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  };
+
   const handleProceed = async () => {
     if (sessionId) {
       setIsNavigating(true);
@@ -592,13 +705,13 @@ export default function PatientInterviewPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <Badge variant="outline" className="mb-2 text-sky-800 border-sky-300 bg-sky-50">
-            Step 5 of 7
+            {i18n.steps.step5}
           </Badge>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-            Clinical Interview
+            {i18n.interview.title}
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Conversational symptom intake persisted to your clinical encounter record.
+            {i18n.interview.subtitle}
           </p>
         </div>
 
@@ -771,8 +884,107 @@ export default function PatientInterviewPage() {
               </div>
             )}
 
+            {/* CHIEF COMPLAINT CONFIRMATION CARD (Step 1 -> Step 2 Gate) */}
+            {isConfirmingChiefComplaint && (
+              <div className="rounded-xl border-2 border-sky-400 bg-white p-4 shadow-md space-y-3 mt-4 ml-9 animate-in fade-in duration-300">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-sky-600 shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">
+                        {i18n.interview.chiefComplaintConfirmTitle}
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        {i18n.interview.chiefComplaintConfirmDesc}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="info" className="text-[10px] shrink-0">
+                    Step 1 Verification
+                  </Badge>
+                </div>
+
+                {isEditingConfirmation ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        ref={confirmInputRef}
+                        value={proposedChiefComplaint}
+                        onChange={(e) => setProposedChiefComplaint(e.target.value)}
+                        placeholder="Edit your chief complaint statement..."
+                        className="text-sm bg-white"
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        variant={isListening ? "destructive" : "outline"}
+                        size="md"
+                        onClick={() => toggleSpeechRecognition(true)}
+                        className={isListening ? "bg-rose-600 text-white animate-pulse" : ""}
+                        title="Edit via speech"
+                      >
+                        {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4 text-sky-600" />}
+                      </Button>
+                    </div>
+                    {isListening && (
+                      <p className="text-[11px] text-rose-600 animate-pulse">
+                        Listening... speak your corrected complaint.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-sm font-medium text-slate-800">
+                    &ldquo;{proposedChiefComplaint}&rdquo;
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  {!isEditingConfirmation ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditingConfirmation(true)}
+                      className="text-xs gap-1.5"
+                    >
+                      <Edit3 className="h-3.5 w-3.5 text-slate-600" />
+                      <span>{i18n.interview.editButton}</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditingConfirmation(false)}
+                      className="text-xs"
+                    >
+                      Done Editing
+                    </Button>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    disabled={isSubmittingConfirmation || !proposedChiefComplaint.trim()}
+                    onClick={handleConfirmChiefComplaint}
+                    className="text-xs gap-1.5 bg-sky-700 hover:bg-sky-800 text-white"
+                  >
+                    {isSubmittingConfirmation ? (
+                      <LoadingSpinner size="sm" />
+                    ) : (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        <span>{i18n.interview.confirmButton}</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Completion Banner inside chat when all 4 questions are done */}
-            {isInterviewComplete && !isSubmitting && (
+            {isInterviewComplete && !isSubmitting && !isConfirmingChiefComplaint && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 p-4 text-emerald-950 space-y-2 mt-4 ml-9">
                 <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
                   <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
@@ -804,7 +1016,7 @@ export default function PatientInterviewPage() {
           </div>
 
           {/* Quick Suggestion Chip for current question */}
-          {!isInterviewComplete && activeQuestion && (
+          {!isInterviewComplete && !isConfirmingChiefComplaint && activeQuestion && (
             <div className="flex items-center gap-2 flex-wrap pt-1 text-xs">
               <span className="text-slate-500 font-medium flex items-center gap-1">
                 <Sparkles className="h-3.5 w-3.5 text-amber-500" />
@@ -813,7 +1025,7 @@ export default function PatientInterviewPage() {
               <button
                 type="button"
                 onClick={() => setInputVal(activeQuestion.quickResponse)}
-                className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-100 hover:border-slate-400 transition-colors text-left"
+                className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-100 hover:border-slate-400 transition-colors text-left cursor-pointer"
               >
                 &ldquo;{activeQuestion.quickResponse}&rdquo;
               </button>
@@ -821,7 +1033,7 @@ export default function PatientInterviewPage() {
           )}
 
           {/* Voice Listening Status Banner */}
-          {isListening && (
+          {isListening && !isConfirmingChiefComplaint && (
             <div className="flex items-center justify-between bg-rose-50 border border-rose-200 text-rose-900 rounded-lg px-3 py-2 text-xs transition-all">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2.5 w-2.5">
@@ -854,7 +1066,7 @@ export default function PatientInterviewPage() {
               <button
                 type="button"
                 onClick={() => setSpeechError(null)}
-                className="text-amber-800 hover:text-amber-950 font-bold ml-2 text-xs px-1"
+                className="text-amber-800 hover:text-amber-950 font-bold ml-2 text-xs px-1 cursor-pointer"
                 aria-label="Dismiss notice"
               >
                 ✕
@@ -869,17 +1081,20 @@ export default function PatientInterviewPage() {
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}
               placeholder={
-                isInterviewComplete
+                isConfirmingChiefComplaint
+                  ? "Please confirm your chief complaint above to proceed..."
+                  : isInterviewComplete
                   ? "Interview complete. Click Proceed below to continue."
                   : isListening
-                  ? "Listening to your voice... (you can also edit or type here)"
+                  ? `${i18n.interview.voiceListening}`
                   : `Type or speak your answer for ${activeQuestion?.domainLabel || "this question"}...`
               }
               disabled={
                 !sessionId ||
                 isSubmitting ||
                 isInitializing ||
-                isInterviewComplete
+                isInterviewComplete ||
+                isConfirmingChiefComplaint
               }
               className="flex-1"
             />
@@ -889,12 +1104,13 @@ export default function PatientInterviewPage() {
               type="button"
               variant={isListening ? "destructive" : "outline"}
               size="md"
-              onClick={toggleSpeechRecognition}
+              onClick={() => toggleSpeechRecognition(false)}
               disabled={
                 !sessionId ||
                 isSubmitting ||
                 isInitializing ||
-                isInterviewComplete
+                isInterviewComplete ||
+                isConfirmingChiefComplaint
               }
               title={
                 isListening
@@ -921,7 +1137,7 @@ export default function PatientInterviewPage() {
               ) : (
                 <>
                   <Mic className="h-4 w-4 text-sky-600" />
-                  <span className="hidden sm:inline ml-1 text-xs">Speak</span>
+                  <span className="hidden sm:inline ml-1 text-xs">{i18n.interview.voiceStart}</span>
                 </>
               )}
             </Button>
@@ -934,7 +1150,8 @@ export default function PatientInterviewPage() {
                 !inputVal.trim() ||
                 !sessionId ||
                 isSubmitting ||
-                isInterviewComplete
+                isInterviewComplete ||
+                isConfirmingChiefComplaint
               }
               className="min-w-[96px]"
             >
@@ -942,7 +1159,7 @@ export default function PatientInterviewPage() {
                 <LoadingSpinner size="sm" />
               ) : (
                 <>
-                  <span>Send</span>
+                  <span>{i18n.interview.sendButton}</span>
                   <Send className="h-3.5 w-3.5 ml-1.5" />
                 </>
               )}
@@ -956,14 +1173,14 @@ export default function PatientInterviewPage() {
             href="/patient/mode"
             className="text-sm font-medium text-slate-600 hover:text-slate-900"
           >
-            &larr; Back to Mode
+            &larr; {i18n.navigation.back}
           </Link>
           <Link
             href="/patient/documents"
             onClick={handleProceed}
             className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
           >
-            <span>{isNavigating ? "Saving..." : "Proceed to Step 6: Documents"}</span>
+            <span>{isNavigating ? "Saving..." : i18n.interview.proceedToDocs}</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </CardFooter>

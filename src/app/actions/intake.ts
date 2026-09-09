@@ -18,6 +18,7 @@ import {
   StructuredQuestionOutput,
 } from "@/lib/ai";
 import { evaluateSessionTriage } from "@/lib/clinical/triage";
+import { cleanChiefComplaint } from "@/lib/clinical/cleaner";
 
 export interface CreateSessionInput {
   patientProfile: PatientProfile;
@@ -45,6 +46,7 @@ export interface SaveAnswerInput {
   inputModality?: "text" | "voice_browser" | "touch_choice";
   language: SupportedLanguage;
   extractedSymptoms?: ExtractedSymptom[];
+  confirmedChiefComplaint?: string;
 }
 
 export interface SaveAnswerResult {
@@ -52,6 +54,7 @@ export interface SaveAnswerResult {
   questionId?: string;
   answerId?: string;
   triageAlert?: TriageEvaluationResult;
+  cleanedChiefComplaint?: string;
   error?: string;
 }
 
@@ -83,17 +86,35 @@ export async function createOrResumeClinicalSessionAction(
     if (existingSessionId) {
       const { data: existingSession, error: checkError } = await supabase
         .from("clinical_sessions")
-        .select("id, session_code, patient_id, status")
+        .select("id, session_code, patient_id, status, language")
         .eq("id", existingSessionId)
         .maybeSingle();
 
       if (!checkError && existingSession) {
-        return {
-          success: true,
-          sessionId: existingSession.id,
-          sessionCode: existingSession.session_code,
-          patientId: existingSession.patient_id,
-        };
+        // Only resume if the session is genuinely in an active, in-progress intake state
+        const isActive =
+          existingSession.status === "intake_active" ||
+          existingSession.status === "interview_complete" ||
+          existingSession.status === "documents_uploaded";
+
+        if (isActive) {
+          // Synchronize language if patient changed it
+          if (language && existingSession.language !== language) {
+            await supabase
+              .from("clinical_sessions")
+              .update({ language })
+              .eq("id", existingSession.id);
+          }
+
+          return {
+            success: true,
+            sessionId: existingSession.id,
+            sessionCode: existingSession.session_code,
+            patientId: existingSession.patient_id,
+          };
+        }
+        // If the session was already completed or closed (e.g. ready_for_review, verified),
+        // it must NOT be resumed. Fall through to create a brand new session for this patient below!
       }
     }
 
@@ -251,11 +272,16 @@ export async function saveClinicalAnswerAction(
       };
     }
 
-    // 3. If step 1 (chief complaint), sync chief_complaint_raw on clinical_sessions
+    // 3. If step 1 (chief complaint), sync structured chief complaint on clinical_sessions
+    let structuredComplaint: string | undefined = undefined;
     if (stepNumber === 1 || questionDomain === "chief_complaint") {
+      structuredComplaint =
+        input.confirmedChiefComplaint?.trim() ||
+        cleanChiefComplaint(answerText.trim(), language);
+
       await supabase
         .from("clinical_sessions")
-        .update({ chief_complaint_raw: answerText.trim() })
+        .update({ chief_complaint_raw: structuredComplaint })
         .eq("id", sessionId);
     }
 
@@ -341,7 +367,38 @@ export async function saveClinicalAnswerAction(
       questionId: questionId,
       answerId: answerData.id,
       triageAlert: finalTriageAlert,
+      cleanedChiefComplaint: structuredComplaint || undefined,
     };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Internal server error";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Confirms or updates the structured chief complaint for the active clinical session.
+ */
+export async function confirmChiefComplaintAction(input: {
+  sessionId: string;
+  confirmedComplaint: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createServerAdminClient();
+    const { sessionId, confirmedComplaint } = input;
+    if (!sessionId || !confirmedComplaint.trim()) {
+      return { success: false, error: "Session ID and complaint are required." };
+    }
+
+    const { error } = await supabase
+      .from("clinical_sessions")
+      .update({ chief_complaint_raw: confirmedComplaint.trim() })
+      .eq("id", sessionId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
     return { success: false, error: message };

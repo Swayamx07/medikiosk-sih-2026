@@ -11,6 +11,9 @@ import {
   IntakeMode,
   SupportedLanguage,
   Gender,
+  UploadedDocumentRecord,
+  DocumentExtractionRecord,
+  DocumentType,
 } from "@/types/clinical";
 
 export interface GetPhysicianQueueResult {
@@ -307,6 +310,54 @@ export async function getPhysicianCaseDetailAction(
         }
       : null;
 
+    // Fetch uploaded documents and extractions for the encounter
+    const { data: rawDocs } = await supabase
+      .from("documents")
+      .select("*")
+      .eq("session_id", session.id)
+      .order("uploaded_at", { ascending: false });
+
+    const documents: UploadedDocumentRecord[] = (rawDocs || []).map((d) => ({
+      id: d.id,
+      sessionId: d.session_id,
+      patientId: d.patient_id,
+      documentType: d.document_type as DocumentType,
+      originalFilename: d.original_filename,
+      storageBucket: d.storage_bucket,
+      storagePath: d.storage_path,
+      mimeType: d.mime_type,
+      fileSizeBytes: d.file_size_bytes,
+      fileChecksumSha256: d.file_checksum_sha256,
+      processingStatus: d.processing_status,
+      errorMessage: d.error_message,
+      uploadedAt: d.uploaded_at,
+      createdAt: d.created_at,
+    }));
+
+    const { data: rawExtractions } = await supabase
+      .from("document_extractions")
+      .select("*")
+      .eq("session_id", session.id);
+
+    const extractions: DocumentExtractionRecord[] = (rawExtractions || []).map(
+      (e) => ({
+        id: e.id,
+        documentId: e.document_id,
+        sessionId: e.session_id,
+        extractedDate: e.extracted_date,
+        issuingFacilityOrDoctor: e.issuing_facility_or_doctor,
+        extractedLabResults: e.extracted_lab_results || [],
+        extractedMedications: e.extracted_medications || [],
+        extractedConditions: e.extracted_conditions || [],
+        rawExtractedPayload: e.raw_extracted_payload || {},
+        confidenceScore: e.confidence_score ? Number(e.confidence_score) : null,
+        extractionProvider: e.extraction_provider,
+        isVerified: e.is_verified,
+        createdAt: e.created_at,
+        updatedAt: e.updated_at,
+      })
+    );
+
     return {
       success: true,
       caseDetail: {
@@ -329,12 +380,17 @@ export async function getPhysicianCaseDetailAction(
         status: session.status as SessionStatus,
         priority: session.priority as PriorityLevel,
         chiefComplaint: session.chief_complaint_raw || "No chief complaint recorded",
+        chiefComplaintVerbatim: history.find(
+          (h) => h.stepNumber === 1 || h.questionDomain === "chief_complaint"
+        )?.answerText,
         startedAt: session.started_at,
         completedAt: session.completed_at,
         assignedPhysicianId: session.assigned_physician_id,
         triageAlerts,
         hasCriticalRedFlag,
         history,
+        documents,
+        extractions,
         physicianReview,
       },
     };

@@ -31,9 +31,14 @@ const INITIAL_STATE: DraftIntakeState = {
   mode: "general",
   messages: [],
   chiefComplaint: "",
+  confirmedChiefComplaint: "",
   sessionStatus: "intake_active",
 };
 
+/**
+ * Recovers persisted draft state if the encounter is still active/in-progress.
+ * If the stored session was already completed or verified, discards it so the next visit starts clean.
+ */
 function getInitialDraftState(): DraftIntakeState {
   if (typeof window === "undefined") {
     return INITIAL_STATE;
@@ -42,6 +47,25 @@ function getInitialDraftState(): DraftIntakeState {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as Partial<DraftIntakeState>;
+
+      // Check if stored session belongs to a completed/closed encounter
+      if (
+        parsed.sessionStatus === "ready_for_review" ||
+        parsed.sessionStatus === "in_physician_review" ||
+        parsed.sessionStatus === "verified" ||
+        parsed.sessionStatus === "abandoned"
+      ) {
+        // A completed encounter must NOT leak into a new visit
+        sessionStorage.removeItem(STORAGE_KEY);
+        return {
+          ...INITIAL_STATE,
+          selectedLanguage: parsed.selectedLanguage || "en",
+          patientProfile: parsed.patientProfile
+            ? { ...parsed.patientProfile, id: undefined }
+            : DEFAULT_PROFILE,
+        };
+      }
+
       return {
         ...INITIAL_STATE,
         ...parsed,
@@ -63,14 +87,20 @@ interface IntakeContextType extends DraftIntakeState {
   setPatientProfile: (profile: Partial<PatientProfile>) => void;
   selectDemoProfile: (caseId: string) => void;
   setMode: (mode: IntakeMode) => void;
-  setSession: (sessionId: string | null, sessionCode: string | null) => void;
+  setSession: (
+    sessionId: string | null,
+    sessionCode: string | null,
+    patientId?: string | null
+  ) => void;
   setChiefComplaint: (complaint: string) => void;
+  setConfirmedChiefComplaint: (complaint: string) => void;
   setSessionStatus: (status: SessionStatus) => void;
   addMessage: (
     message: Omit<ConversationMessage, "id" | "timestamp">
   ) => void;
   clearMessages: () => void;
   resetIntake: () => void;
+  startNewEncounter: (options?: { keepPatientProfile?: boolean }) => void;
 }
 
 const IntakeContext = createContext<IntakeContextType | undefined>(undefined);
@@ -124,7 +154,10 @@ export function IntakeProvider({ children }: { children: React.ReactNode }) {
     if (demo) {
       setState((prev) => ({
         ...prev,
-        patientProfile: { ...demo },
+        patientProfile: {
+          ...demo,
+          primaryLanguage: prev.selectedLanguage, // Preserve selected language
+        },
       }));
     }
   }, []);
@@ -134,8 +167,19 @@ export function IntakeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setSession = useCallback(
-    (sessionId: string | null, sessionCode: string | null) => {
-      setState((prev) => ({ ...prev, sessionId, sessionCode }));
+    (
+      sessionId: string | null,
+      sessionCode: string | null,
+      patientId?: string | null
+    ) => {
+      setState((prev) => ({
+        ...prev,
+        sessionId,
+        sessionCode,
+        patientProfile: patientId
+          ? { ...prev.patientProfile, id: patientId }
+          : prev.patientProfile,
+      }));
     },
     []
   );
@@ -143,6 +187,13 @@ export function IntakeProvider({ children }: { children: React.ReactNode }) {
   const setChiefComplaint = useCallback((chiefComplaint: string) => {
     setState((prev) => ({ ...prev, chiefComplaint }));
   }, []);
+
+  const setConfirmedChiefComplaint = useCallback(
+    (confirmedChiefComplaint: string) => {
+      setState((prev) => ({ ...prev, confirmedChiefComplaint }));
+    },
+    []
+  );
 
   const setSessionStatus = useCallback((sessionStatus: SessionStatus) => {
     setState((prev) => ({ ...prev, sessionStatus }));
@@ -167,6 +218,9 @@ export function IntakeProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, messages: [] }));
   }, []);
 
+  /**
+   * Resets intake completely.
+   */
   const resetIntake = useCallback(() => {
     setState(INITIAL_STATE);
     try {
@@ -175,6 +229,36 @@ export function IntakeProvider({ children }: { children: React.ReactNode }) {
       // Ignore storage errors
     }
   }, []);
+
+  /**
+   * Starts a brand new clinical encounter.
+   * If keepPatientProfile is true, retains demographic identity while resetting encounter data.
+   */
+  const startNewEncounter = useCallback(
+    (options?: { keepPatientProfile?: boolean }) => {
+      setState((prev) => ({
+        ...INITIAL_STATE,
+        selectedLanguage: prev.selectedLanguage,
+        patientProfile: options?.keepPatientProfile
+          ? { ...prev.patientProfile, id: undefined }
+          : DEFAULT_PROFILE,
+        consentGranted: false,
+        consentTimestamp: null,
+        sessionId: null,
+        sessionCode: null,
+        messages: [],
+        chiefComplaint: "",
+        confirmedChiefComplaint: "",
+        sessionStatus: "intake_active",
+      }));
+      try {
+        sessionStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // Ignore
+      }
+    },
+    []
+  );
 
   return (
     <IntakeContext.Provider
@@ -187,10 +271,12 @@ export function IntakeProvider({ children }: { children: React.ReactNode }) {
         setMode,
         setSession,
         setChiefComplaint,
+        setConfirmedChiefComplaint,
         setSessionStatus,
         addMessage,
         clearMessages,
         resetIntake,
+        startNewEncounter,
       }}
     >
       {children}

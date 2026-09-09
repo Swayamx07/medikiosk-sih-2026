@@ -12,30 +12,32 @@ import {
 } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useIntake } from "@/context/IntakeContext";
+import { PATIENT_I18N } from "@/lib/clinical/i18n";
 import { cn } from "@/lib/utils";
 
 export default function PatientModePage() {
-  const { mode, setMode } = useIntake();
+  const { mode, setMode, selectedLanguage } = useIntake();
+  const i18n = PATIENT_I18N[selectedLanguage] || PATIENT_I18N.en;
 
   return (
     <div className="space-y-6">
       <div>
         <Badge variant="outline" className="mb-2 text-sky-800 border-sky-300 bg-sky-50">
-          Step 4 of 7
+          {i18n.steps.step4}
         </Badge>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-          Select Clinical Intake Mode
+          {i18n.mode.title}
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Choose the consultation discipline to adapt clinical questionnaire and terminology.
+          {i18n.mode.subtitle}
         </p>
       </div>
 
       <Card className="border-slate-200">
         <CardHeader>
-          <CardTitle>Intake Discipline</CardTitle>
+          <CardTitle>{i18n.mode.cardTitle}</CardTitle>
           <CardDescription>
-            Different medical systems evaluate symptoms according to their specific clinical methodologies.
+            {i18n.mode.cardDesc}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -55,7 +57,7 @@ export default function PatientModePage() {
                 <div className="flex items-center gap-2">
                   <Stethoscope className="h-5 w-5 text-sky-600" />
                   <h4 className="text-base font-semibold text-slate-900">
-                    General OPD / Allopathy
+                    {i18n.mode.generalTitle}
                   </h4>
                 </div>
                 {mode === "general" && (
@@ -65,7 +67,7 @@ export default function PatientModePage() {
                 )}
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Standard clinical symptom inquiry: onset, duration, severity, red-flag triage, and medication history.
+                {i18n.mode.generalDesc}
               </p>
             </div>
             <div className="mt-4 pt-2 border-t border-slate-100 flex items-center justify-between">
@@ -73,7 +75,7 @@ export default function PatientModePage() {
                 Primary SIH Workflow
               </Badge>
               <span className="text-xs font-medium text-sky-700">
-                {mode === "general" ? "Active Mode ✓" : "Select"}
+                {mode === "general" ? i18n.mode.activeMode : i18n.mode.selectMode}
               </span>
             </div>
           </button>
@@ -94,7 +96,7 @@ export default function PatientModePage() {
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-amber-600" />
                   <h4 className="text-base font-semibold text-slate-900">
-                    AYUSH Mode
+                    {i18n.mode.ayushTitle}
                   </h4>
                 </div>
                 {mode === "ayush" && (
@@ -104,7 +106,7 @@ export default function PatientModePage() {
                 )}
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Structured traditional intake including Dashavidha Pariksha, Prakriti, and lifestyle history.
+                {i18n.mode.ayushDesc}
               </p>
             </div>
             <div className="mt-4 pt-2 border-t border-slate-100 flex items-center justify-between">
@@ -112,7 +114,7 @@ export default function PatientModePage() {
                 Phase 10 Extension
               </Badge>
               <span className="text-xs font-medium text-amber-700">
-                {mode === "ayush" ? "Active Mode ✓" : "Select"}
+                {mode === "ayush" ? i18n.mode.activeMode : i18n.mode.selectMode}
               </span>
             </div>
           </button>
@@ -122,13 +124,13 @@ export default function PatientModePage() {
             href="/patient/identify"
             className="text-sm font-medium text-slate-600 hover:text-slate-900"
           >
-            &larr; Back to Identify
+            &larr; {i18n.navigation.back}
           </Link>
           <Link
             href="/patient/interview"
             className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600"
           >
-            <span>Proceed to Step 5: Interview</span>
+            <span>{i18n.navigation.proceed}</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </CardFooter>

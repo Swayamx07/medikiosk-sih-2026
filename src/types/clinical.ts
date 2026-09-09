@@ -103,6 +103,7 @@ export interface DraftIntakeState {
   mode: IntakeMode;
   messages: ConversationMessage[];
   chiefComplaint?: string;
+  confirmedChiefComplaint?: string;
   sessionStatus?: SessionStatus;
 }
 
@@ -215,12 +216,15 @@ export interface PhysicianCaseDetail {
   status: SessionStatus;
   priority: PriorityLevel;
   chiefComplaint: string;
+  chiefComplaintVerbatim?: string;
   startedAt: string;
   completedAt?: string | null;
   assignedPhysicianId?: string | null;
   triageAlerts: TriageAlertRecord[];
   hasCriticalRedFlag: boolean;
   history: CaseAnswerDetail[];
+  documents: UploadedDocumentRecord[];
+  extractions: DocumentExtractionRecord[];
   physicianReview?: {
     id: string;
     reviewStatus: string;
@@ -228,5 +232,87 @@ export interface PhysicianCaseDetail {
     editedClinicalSummary?: string | null;
     physicianNotes?: string | null;
   } | null;
+}
+
+/**
+ * Document Ingestion & Structured Multimodal Extraction Types (Phase 5)
+ */
+export type DocumentType =
+  | "prescription"
+  | "lab_report"
+  | "discharge_summary"
+  | "radiology_report"
+  | "other";
+
+export type DocumentProcessingStatus =
+  | "uploaded"
+  | "processing"
+  | "completed"
+  | "failed";
+
+export interface ExtractedLabResult {
+  testName: string;
+  value: string;
+  unit?: string;
+  referenceRange?: string;
+  isAbnormal?: boolean;
+  flag?: "normal" | "high" | "low" | "abnormal";
+}
+
+export interface ExtractedMedication {
+  name: string;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
+  instructions?: string;
+}
+
+export interface ExtractedCondition {
+  name: string;
+  status?: string;
+  notes?: string;
+}
+
+export interface DocumentExtractionPayload {
+  extractedDate?: string;
+  issuingFacilityOrDoctor?: string;
+  labResults: ExtractedLabResult[];
+  medications: ExtractedMedication[];
+  conditions: ExtractedCondition[];
+  rawSummary?: string;
+}
+
+export interface UploadedDocumentRecord {
+  id: string;
+  sessionId: string;
+  patientId: string;
+  documentType: DocumentType;
+  originalFilename: string;
+  storageBucket: string;
+  storagePath: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  fileChecksumSha256?: string | null;
+  processingStatus: DocumentProcessingStatus;
+  errorMessage?: string | null;
+  uploadedAt: string;
+  createdAt?: string;
+}
+
+export interface DocumentExtractionRecord {
+  id: string;
+  documentId: string;
+  sessionId: string;
+  extractedDate?: string | null;
+  issuingFacilityOrDoctor?: string | null;
+  extractedLabResults: ExtractedLabResult[];
+  extractedMedications: ExtractedMedication[];
+  extractedConditions: ExtractedCondition[];
+  rawExtractedPayload: Record<string, unknown>;
+  confidenceScore?: number | null;
+  extractionProvider: string;
+  isVerified: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
