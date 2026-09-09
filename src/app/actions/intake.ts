@@ -9,7 +9,15 @@ import {
   PriorityLevel,
   ClinicalDomain,
   ExtractedSymptom,
+  TriageEvaluationResult,
+  TriageAlertLevel,
 } from "@/types/clinical";
+import {
+  generateNextIntakeQuestion,
+  GenerateQuestionInput,
+  StructuredQuestionOutput,
+} from "@/lib/ai";
+import { evaluateSessionTriage } from "@/lib/clinical/triage";
 
 export interface CreateSessionInput {
   patientProfile: PatientProfile;
@@ -43,6 +51,7 @@ export interface SaveAnswerResult {
   success: boolean;
   questionId?: string;
   answerId?: string;
+  triageAlert?: TriageEvaluationResult;
   error?: string;
 }
 
@@ -250,10 +259,88 @@ export async function saveClinicalAnswerAction(
         .eq("id", sessionId);
     }
 
+    // 4. Fetch cumulative answers and session info for deterministic safety evaluation
+    // Execution Order: Answer has already been persisted to clinical_answers above.
+    const { data: allAnswers } = await supabase
+      .from("clinical_answers")
+      .select("raw_answer_text")
+      .eq("session_id", sessionId)
+      .order("answered_at", { ascending: true });
+
+    const cumulativeTexts = (allAnswers || []).map((a) => a.raw_answer_text);
+    if (cumulativeTexts.length === 0) {
+      cumulativeTexts.push(answerText.trim());
+    }
+
+    // 5. Run pure deterministic triage evaluator
+    const triageResult = evaluateSessionTriage(cumulativeTexts);
+    let finalTriageAlert: TriageEvaluationResult | undefined = undefined;
+
+    if (triageResult.triggered && triageResult.triggerRuleId) {
+      // Retrieve patient_id for foreign key reference
+      const { data: sessionData } = await supabase
+        .from("clinical_sessions")
+        .select("patient_id, priority")
+        .eq("id", sessionId)
+        .single();
+
+      if (sessionData?.patient_id) {
+        // DUPLICATE PREVENTION: check if this rule has already fired for this session
+        const { data: existingAlert } = await supabase
+          .from("triage_alerts")
+          .select(
+            "id, alert_level, trigger_rule_id, trigger_reason, trigger_symptoms, is_acknowledged"
+          )
+          .eq("session_id", sessionId)
+          .eq("trigger_rule_id", triageResult.triggerRuleId)
+          .maybeSingle();
+
+        if (existingAlert) {
+          finalTriageAlert = {
+            triggered: true,
+            alertLevel: existingAlert.alert_level as TriageAlertLevel,
+            triggerRuleId: existingAlert.trigger_rule_id,
+            triggerReason: existingAlert.trigger_reason,
+            triggerSymptoms: (existingAlert.trigger_symptoms as string[]) || [],
+            isExisting: true,
+          };
+        } else {
+          // Escalate session priority to 'emergency' while preserving status lifecycle
+          await supabase
+            .from("clinical_sessions")
+            .update({ priority: "emergency" })
+            .eq("id", sessionId);
+
+          // Populate existing triage_alerts schema
+          const { error: alertError } = await supabase
+            .from("triage_alerts")
+            .insert({
+              session_id: sessionId,
+              patient_id: sessionData.patient_id,
+              alert_level: triageResult.alertLevel || "critical_red_flag",
+              trigger_rule_id: triageResult.triggerRuleId,
+              trigger_reason: triageResult.triggerReason || "",
+              trigger_symptoms: triageResult.triggerSymptoms || [],
+              is_acknowledged: false,
+            });
+
+          if (alertError) {
+            console.warn("Could not record triage alert row:", alertError.message);
+          }
+
+          finalTriageAlert = {
+            ...triageResult,
+            isExisting: false,
+          };
+        }
+      }
+    }
+
     return {
       success: true,
       questionId: questionId,
       answerId: answerData.id,
+      triageAlert: finalTriageAlert,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
@@ -315,3 +402,152 @@ export async function updateClinicalSessionStatusAction(
     return { success: false, error: message };
   }
 }
+
+export interface SessionHistoryItem {
+  questionId: string;
+  stepNumber: number;
+  questionDomain: ClinicalDomain;
+  questionText: string;
+  questionTextCanonical: string;
+  answerId: string;
+  answerText: string;
+  answeredAt: string;
+}
+
+export interface GetSessionHistoryResult {
+  success: boolean;
+  history?: SessionHistoryItem[];
+  chiefComplaint?: string;
+  status?: SessionStatus;
+  triageAlert?: TriageEvaluationResult;
+  error?: string;
+}
+
+/**
+ * Retrieves the recorded question and answer history for an active session.
+ */
+export async function getSessionHistoryAction(
+  sessionId: string
+): Promise<GetSessionHistoryResult> {
+  try {
+    const supabase = createServerAdminClient();
+
+    if (!sessionId) {
+      return { success: false, error: "Session ID is required." };
+    }
+
+    const { data: questions, error: qErr } = await supabase
+      .from("clinical_questions")
+      .select(`
+        id,
+        step_number,
+        clinical_domain,
+        question_text,
+        question_text_canonical,
+        clinical_answers (
+          id,
+          raw_answer_text,
+          answered_at
+        )
+      `)
+      .eq("session_id", sessionId)
+      .order("step_number", { ascending: true });
+
+    if (qErr) {
+      return { success: false, error: qErr.message };
+    }
+
+    const { data: session } = await supabase
+      .from("clinical_sessions")
+      .select("status, chief_complaint_raw")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    // Check if session has any active triage alert
+    const { data: alert } = await supabase
+      .from("triage_alerts")
+      .select(
+        "alert_level, trigger_rule_id, trigger_reason, trigger_symptoms, is_acknowledged"
+      )
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    const triageAlert: TriageEvaluationResult | undefined = alert
+      ? {
+          triggered: true,
+          alertLevel: alert.alert_level as TriageAlertLevel,
+          triggerRuleId: alert.trigger_rule_id,
+          triggerReason: alert.trigger_reason,
+          triggerSymptoms: (alert.trigger_symptoms as string[]) || [],
+          isExisting: true,
+        }
+      : undefined;
+
+    const history: SessionHistoryItem[] = (questions || [])
+      .filter(
+        (q) =>
+          q.clinical_answers &&
+          (q.clinical_answers as Array<{ id: string; raw_answer_text: string; answered_at: string }>).length > 0
+      )
+      .map((q) => {
+        const answers = q.clinical_answers as Array<{
+          id: string;
+          raw_answer_text: string;
+          answered_at: string;
+        }>;
+        const ans = answers[0];
+        return {
+          questionId: q.id,
+          stepNumber: q.step_number,
+          questionDomain: q.clinical_domain as ClinicalDomain,
+          questionText: q.question_text,
+          questionTextCanonical: q.question_text_canonical,
+          answerId: ans.id,
+          answerText: ans.raw_answer_text,
+          answeredAt: ans.answered_at,
+        };
+      });
+
+    return {
+      success: true,
+      history,
+      chiefComplaint: session?.chief_complaint_raw || undefined,
+      status: (session?.status as SessionStatus) || undefined,
+      triageAlert,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Internal server error";
+    return { success: false, error: message };
+  }
+}
+
+export interface GenerateNextQuestionResult {
+  success: boolean;
+  question: StructuredQuestionOutput;
+  error?: string;
+}
+
+/**
+ * Generates the next conversational intake question via server-side AI adapter.
+ * Uses Gemini if configured; gracefully falls back to deterministic questions.
+ */
+export async function generateNextQuestionAction(
+  input: GenerateQuestionInput
+): Promise<GenerateNextQuestionResult> {
+  try {
+    const question = await generateNextIntakeQuestion(input);
+    return { success: true, question };
+  } catch (err) {
+    // Ultimate fallback if any unhandled error occurs
+    const { MockAIProvider } = await import("@/lib/ai/mock-provider");
+    const mock = new MockAIProvider();
+    const fallback = await mock.generateNextQuestion(input);
+    return {
+      success: true,
+      question: fallback,
+      error: err instanceof Error ? err.message : "Fallback activated",
+    };
+  }
+}
+
+

@@ -43,6 +43,31 @@ export interface ExtractedSymptom {
   confidence?: number;
 }
 
+export type TriageAlertLevel = "info" | "warning" | "critical_red_flag";
+
+export interface TriageEvaluationResult {
+  triggered: boolean;
+  alertLevel?: TriageAlertLevel;
+  triggerRuleId?: string;
+  triggerReason?: string;
+  triggerSymptoms?: string[];
+  isExisting?: boolean;
+}
+
+export interface TriageAlertRecord {
+  id?: string;
+  sessionId: string;
+  patientId: string;
+  alertLevel: TriageAlertLevel;
+  triggerRuleId: string;
+  triggerReason: string;
+  triggerSymptoms: string[];
+  isAcknowledged: boolean;
+  acknowledgedBy?: string | null;
+  acknowledgedAt?: string | null;
+  createdAt?: string;
+}
+
 export interface ConversationMessage {
   id: string;
   sender: "ai" | "patient" | "system";
@@ -131,3 +156,77 @@ export const SYNTHETIC_DEMO_CASES: Record<
       "Chronic joint stiffness and digestion issues for past 3 months.",
   },
 };
+
+/**
+ * Physician workstation types for live queue and case review.
+ */
+export interface PhysicianQueueItem {
+  sessionId: string;
+  sessionCode: string;
+  patientId: string;
+  patientIdentifier: string;
+  patientName: string;
+  dateOfBirth?: string;
+  gender?: Gender;
+  mode: IntakeMode;
+  language: SupportedLanguage;
+  status: SessionStatus;
+  priority: PriorityLevel;
+  chiefComplaint: string;
+  startedAt: string;
+  completedAt?: string | null;
+  triageAlertCount: number;
+  hasCriticalRedFlag: boolean;
+  triggerRuleId?: string;
+  isAcknowledged?: boolean;
+}
+
+export interface CaseAnswerDetail {
+  questionId: string;
+  stepNumber: number;
+  questionDomain: ClinicalDomain;
+  questionText: string;
+  questionTextCanonical: string;
+  answerId: string;
+  answerText: string;
+  inputModality: "text" | "voice_browser" | "voice_bhashini" | "touch_choice";
+  languageDetected: string;
+  confidenceScore?: number;
+  answeredAt: string;
+}
+
+export interface PhysicianCaseDetail {
+  sessionId: string;
+  sessionCode: string;
+  patientId: string;
+  patient: {
+    id: string;
+    patientIdentifier: string;
+    fullName: string;
+    dateOfBirth: string;
+    gender: Gender;
+    phoneNumber?: string | null;
+    abhaId?: string | null;
+    isDemo: boolean;
+    demoCaseId?: string | null;
+  };
+  mode: IntakeMode;
+  language: SupportedLanguage;
+  status: SessionStatus;
+  priority: PriorityLevel;
+  chiefComplaint: string;
+  startedAt: string;
+  completedAt?: string | null;
+  assignedPhysicianId?: string | null;
+  triageAlerts: TriageAlertRecord[];
+  hasCriticalRedFlag: boolean;
+  history: CaseAnswerDetail[];
+  physicianReview?: {
+    id: string;
+    reviewStatus: string;
+    isVerified: boolean;
+    editedClinicalSummary?: string | null;
+    physicianNotes?: string | null;
+  } | null;
+}
+
