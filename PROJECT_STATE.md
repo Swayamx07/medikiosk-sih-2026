@@ -7,83 +7,129 @@
 
 # CURRENT PHASE
 
-PHASE 1 — DATABASE & STORAGE
+PHASE 4 & CHECKPOINT 6 COMPLETE — AWAITING PHASE 5 (DOCUMENT INGESTION)
 
 ---
 
 # CURRENT TASK
 
-Phase 1 Complete — Awaiting Phase 2 Authorization (Voice & Multilingual Patient Intake)
+Phase 5 Pre-Implementation Inspection Completed — Awaiting Authorization to Implement Phase 5 (Document Ingestion & Clinical Document Processing).
 
 ---
 
 # COMPLETED
 
-- [x] GitHub repository created
-- [x] Local project created
-- [x] Next.js initialized
-- [x] Initial project pushed to GitHub
-- [x] AI control files created
+### 1. Foundation & Design System (Phase 0)
+- [x] GitHub repository created and local workspace initialized
+- [x] Next.js 16 initialized with App Router and TypeScript
 - [x] Global healthcare design system tokens and Tailwind CSS configured
-- [x] Core UI primitives created (Button, Card, Badge, Input, LoadingState, EmptyState, ErrorState)
-- [x] Layout components created (Navbar, Footer, PageContainer)
-- [x] MediKiosk landing page created ("Capture. Structure. Review." with two primary entry points)
-- [x] Patient Experience route shells established:
-  - `/patient` (Intake Hub)
-  - `/patient/language` (Language Selection)
-  - `/patient/consent` (Informed Consent)
-  - `/patient/identify` (Patient Demographics / Demo Identification)
-  - `/patient/mode` (Clinical Intake Mode: General OPD vs AYUSH)
-  - `/patient/interview` (Conversational Intake Shell)
-  - `/patient/documents` (Previous Document Upload Shell)
-  - `/patient/review` (Intake Review & Submission Shell)
-- [x] Physician Experience route shells established:
-  - `/doctor` (Physician Dashboard Overview)
-  - `/doctor/patients` (Patient Queue & Triage Shell)
-  - `/doctor/patients/[id]` (Patient Case Review, Summary & Verification Shell)
-  - `/doctor/interoperability` (FHIR R4 & ABDM Architecture Shell)
-- [x] Production build and ESLint verified (0 errors, 0 warnings across all 15 routes)
-- [x] Phase 1A Database Schema Design created and approved (`docs/PHASE_1A_DATABASE_SCHEMA.md`)
-- [x] Phase 1B Initial Supabase migration created (`supabase/migrations/20260908003600_initial_schema.sql`):
-  - 12 core tables with UUID primary keys and strict PostgreSQL check constraints
-  - Derived runtime patient age (no persisted age column)
-  - Automatic `updated_at` triggers
-  - Comprehensive foreign-key indexes and query performance indexes
-  - Private Supabase Storage bucket (`medical-documents`) configuration
-- [x] Phase 1B Comprehensive Security Audit conducted (`docs/PHASE_1B_SECURITY_REVIEW.md`)
-- [x] Phase 1B Final RLS Review & Minimum Authorization Specification completed (`docs/PHASE_1B_RLS_FINAL_REVIEW.md`)
-- [x] Phase 1B RLS Hardening migration implemented and validated (`supabase/migrations/20260908005000_harden_rls.sql`):
-  - Anonymous SELECT access revoked across all 10 sensitive clinical tables
-  - Broad `FOR ALL` anon mutation policies completely eliminated
-  - Direct client-side INSERT revoked on AI/system tables (`clinical_histories`, `medical_timeline`, `audit_logs`)
-  - Authenticated status transitions strictly whitelisted (`clinical_sessions`, `clinical_histories`, `document_extractions`, `physician_reviews`, `triage_alerts`)
-  - Direct client storage upload policies revoked (uploads mediated server-side via Server Actions using service_role)
-  - Medical record non-repudiation enforced for verified physician reviews and clinical histories
-  - Audit log append-only guarantees fortified (zero client update/delete/insert)
-- [x] Supabase CLI configuration created (`supabase/config.toml`)
-- [x] Phase 1C Remote database migration executed cleanly:
-  - Fixed PostgreSQL 42501 storage ownership requirement in initial migration
-  - Executed preflight structural and dependency validation
-  - Successfully applied `20260908003600_initial_schema.sql` and `20260908005000_harden_rls.sql` via Supabase CLI
-  - Confirmed remote ledger records both migrations active
-- [x] Phase 1C Synthetic demo seed data & storage fixtures deployed and verified:
-  - Generated valid synthetic PDF fixture (1,543 bytes, `lab_report_glycemic_aug2026.pdf`)
-  - Uploaded fixture to private `medical-documents` bucket at exact storage path via Supabase CLI
-  - Populated all 12 tables via `supabase/seed.sql` (3 patients, 3 sessions, 3 consents, 6 questions, 6 answers, 3 histories, 1 triage alert, 1 document, 1 extraction, 4 timeline events, 1 physician review, 11 audit logs)
-  - Verified exact row counts and storage object metadata match via read-only SQL queries
-  - Verified zero migration drift via `npx supabase db push --dry-run`
+- [x] Accessible UI primitives (`Button`, `Card`, `Badge`, `Input`, `LoadingState`, `EmptyState`, `ErrorState`)
+- [x] Layout components (`Navbar`, `Footer`, `PageContainer`)
+- [x] MediKiosk landing page ("Capture. Structure. Review.")
+
+### 2. Database, Storage & Security Hardening (Phase 1)
+- [x] 12-table PostgreSQL schema with UUID PKs, check constraints, foreign-key indexes, and triggers (`20260908003600_initial_schema.sql`)
+- [x] Private Supabase Storage bucket (`medical-documents`, 15 MB limit, PDF/image MIME restrictions)
+- [x] Hardened RLS architecture (`20260908005000_harden_rls.sql`):
+  - Anonymous client SELECT and direct mutation revoked across all 10 sensitive clinical tables
+  - Direct client-side storage uploads eliminated (all uploads server-mediated via Next.js Server Actions using service role)
+  - Append-only audit logging with zero client mutation policies
+  - Strict status transition whitelisting for authenticated physicians
+- [x] Migrations deployed to remote Supabase project via Supabase CLI
+- [x] Synthetic demo fixtures deployed and verified (`lab_report_glycemic_aug2026.pdf` in storage + 43 seed rows across 3 demo cases in `supabase/seed.sql`)
+
+### 3. Patient Intake Flow & Multilingual Conversational Engine (Phase 2)
+- [x] Complete 7-step patient kiosk journey:
+  - Step 1: `/patient` (Intake Hub & instructions)
+  - Step 2: `/patient/language` (Language selection: English, Hindi, Marathi)
+  - Step 3: `/patient/consent` (Informed consent with timestamping)
+  - Step 4: `/patient/identify` (Patient demographics & ABHA ID / demo case selection)
+  - Step 5: `/patient/mode` (General OPD vs AYUSH Pariksha)
+  - Step 6: `/patient/interview` (Conversational intake experience)
+  - Step 7: `/patient/review` (Summary review & kiosk submission)
+- [x] Server-mediated persistence via Next.js Server Actions (`src/app/actions/intake.ts`):
+  - `createOrResumeSessionAction`: binds session, consent, and patient profile in Supabase
+  - `saveIntakeAnswerAction`: atomic persistence of questions and answers before conversation progresses
+- [x] Multilingual conversational interview supporting English (`en`), Hindi (`hi`), and Marathi (`mr`)
+- [x] Browser voice intake using Web Speech API with automatic speech recognition and graceful manual text editing fallback
+- [x] Gemini question generation (`GeminiAIProvider`) with robust, deterministic rule-based fallback (`MockDeterministicProvider`) ensuring zero kiosk downtime
+
+### 4. Deterministic Clinical Safety & Red-Flag Triage Engine (Phase 4)
+- [x] Deterministic multilingual red-flag triage engine (`src/lib/clinical/triage.ts`)
+- [x] Explainable safety evaluation without LLM hallucination risk
+- [x] `RULE_CARDIAC_CHEST_PAIN`:
+  - Triggers on acute chest pain/pressure/tightness + at least one secondary feature (diaphoresis, dyspnea, left arm/shoulder radiation, or severe intensity)
+  - Evaluates cumulative patient responses across English, Hindi, and Marathi
+- [x] Automatic session priority escalation: `clinical_sessions.priority` elevated to `'emergency'`
+- [x] Server-mediated safety alert persistence in `triage_alerts` (`alert_level: 'critical_red_flag'`)
+- [x] Idempotent duplicate alert prevention per session
+- [x] Non-diagnostic clinical advisory banner presented to patient
+
+### 5. Live Physician Workstation & Case Review (Checkpoint 6)
+- [x] Live Supabase-backed physician queue (`/doctor/patients` via `getPhysicianQueueAction`):
+  - Fetches live outpatient encounters from `clinical_sessions`, `patients`, and `triage_alerts`
+  - Real-time clinical priority queue sorting (emergency/red-flag cases top-ranked, followed by urgent, then recency)
+  - Visual badges for session code, status, priority, and critical red-flag alerts
+- [x] Live case encounter detail review (`/doctor/patients/[id]` via `getPhysicianCaseDetailAction`):
+  - Resolution by UUID session ID, session code (`CS-2026-0908-01`), or demo slug
+  - Patient demographics (name, identifier, age derived from DOB, gender, phone, ABHA ID)
+  - Prominent emergency safety alert banner showing trigger rule ID, reason, and detected symptoms
+  - Chronological Q&A audit trail displaying step number, clinical domain, kiosk prompt, verbatim patient answer, modality (`text` vs `voice_browser`), language, and timestamp
+  - Encounter metadata card (intake mode, primary language, priority, status, start/completion timestamps)
+
+### 6. Phase 5 Document Infrastructure Inspection (Completed)
+- [x] Completed pre-implementation architectural inspection of existing document infrastructure:
+  - `documents` table: fully supports document metadata, checksums, status, and MIME types
+  - `document_extractions` table: fully supports structured JSONB labs, medications, and conditions
+  - `medical_timeline` & `audit_logs`: support document event sourcing
+  - Private `medical-documents` storage bucket: configured and verified
+  - Hardened RLS policies: server-mediated model confirmed; **zero database migrations or RLS changes needed**
 
 ---
 
 # IN PROGRESS
 
-None (Phase 1 Database, Storage & Seed complete; awaiting Phase 2 authorization).
+None. Phase 4 and Checkpoint 6 complete and fully verified. Ready for Phase 5 implementation.
 
 ---
 
-# NEXT TASK
+# NEXT CHECKPOINT / NEXT TASK
 
-Phase 2 — Multilingual Voice & Patient Intake Experience (Bhashini / Web Speech API & Conversational Engine).
+### PHASE 5 — DOCUMENT INGESTION & CLINICAL DOCUMENT PROCESSING (NOT IMPLEMENTED / NEXT CHECKPOINT)
+
+**Objective**:
+Transform `/patient/documents` from a static UI shell into a functional, secure document ingestion step.
+
+**Scope of Work**:
+- PDF/image file validation (MIME types: `application/pdf`, `image/jpeg`, `image/png`, `image/webp`; max 15 MB).
+- Server-mediated upload to private `medical-documents` bucket using `createServerAdminClient()`.
+- Metadata persistence in `documents` table with SHA-256 checksum and processing status.
+- Server-side multimodal extraction (`src/lib/ai/document-extractor.ts`) using Gemini vision with deterministic fallback.
+- Strictly non-diagnostic structured extraction (issuing doctor/facility, date, lab values/ranges, medications, conditions).
+- Persistence into `document_extractions` and `medical_timeline`.
+- Interactive patient upload UI with drag-and-drop, progress indicators, extraction preview, and review continuation.
+- Physician case-detail visibility of uploaded documents and extracted clinical findings at `/doctor/patients/[id]`.
+
+---
+
+# VERIFICATION STATUS
+
+- [x] **Lint**: `npm run lint` PASSED (0 errors, 0 warnings)
+- [x] **TypeScript**: `npx tsc --noEmit` PASSED (0 compilation errors)
+- [x] **Production Build**: `npm run build` PASSED (all 15 routes compiled cleanly)
+- [x] **Triage Engine Test Suite**: `npx tsx scripts/test-triage.ts` PASSED (8/8 tests passed):
+  - English, Hindi, and Marathi cardiac red-flag triggers
+  - Negative and insufficient combination handling
+  - Answer persistence ordering before alert generation
+  - Emergency priority escalation
+  - Idempotent duplicate alert prevention
+- [x] **Physician Queue Test Suite**: `npx tsx scripts/test-physician-queue.ts` PASSED (8/8 tests passed):
+  - Live Supabase queue fetching
+  - Priority-based sorting (emergency cases top-ranked)
+  - Queue-level triage alert and red-flag visibility
+  - Case 1 (acute cardiac), Case 2 (chronic care), and Case 3 (verified encounter) detail retrieval
+  - UUID session ID resolution
+  - Chronological Q&A and modality/language metadata
 
 ---
 
@@ -107,37 +153,42 @@ Verified clean (`next build` passed with 15/15 routes generated; `npm run lint` 
 
 # DEPLOYMENT STATUS
 
-Not deployed.
+Not deployed (local Next.js development and production build verified).
 
 ---
 
 # DATABASE STATUS
 
-Connected and fully migrated (12 tables, check constraints, RLS policies, indexes, and storage bucket configured).
+Connected and fully migrated on Supabase (12 tables, check constraints, hardened RLS policies, indexes, and private `medical-documents` storage bucket active).
 
 ---
 
 # AI STATUS
 
-Not connected.
+- Gemini 1.5 Flash integrated server-side with strict 4-second timeout and temperature 0.2.
+- Robust deterministic fallback provider active for zero-downtime offline kiosk operation.
+- Credentials strictly server-mediated; never exposed to browser.
 
 ---
 
 # DEMO STATUS
 
-Architectural route shells functional. Workflows pending upcoming roadmap phases.
+- Live Patient Intake Journey (Steps 1–5 and Step 7) fully functional with Supabase persistence.
+- Step 6 `/patient/interview` conversational intake with voice and Gemini/deterministic questions fully functional.
+- Step 6 `/patient/documents` is currently a UI shell (to be implemented in Phase 5).
+- Live Physician Queue (`/doctor/patients`) and Case Review (`/doctor/patients/[id]`) fully functional with live Supabase data.
 
 ---
 
 # LAST VERIFIED
 
-Phase 0 Foundation UI and application shell verified locally.
+Phase 4 Deterministic Safety Triage and Checkpoint 6 Live Supabase Physician Queue verified end-to-end with automated test suites, linting, type-checking, and production build.
 
 ---
 
 # ACTIVE ROADMAP PHASE
 
-PHASE 1
+PHASE 5 — DOCUMENT INGESTION & CLINICAL DOCUMENT PROCESSING (READY TO START)
 
 ---
 
@@ -145,68 +196,65 @@ PHASE 1
 
 - Do not build unrelated features.
 - Do not implement analytics before the core workflow.
-- Do not add RAG.
-- Do not add vector search.
-- Do not add unnecessary infrastructure.
-- Do not change the architecture without approval.
-
----
-
-# NEXT CHECKPOINT
-
-Phase 2: Multilingual Voice & Patient Intake Experience (Bhashini / Web Speech API & Conversational Engine).
+- Do not add RAG or vector search.
+- Do not add unnecessary infrastructure or npm dependencies.
+- Do not alter database migrations or RLS policies unless explicitly required.
+- Do not expose `SUPABASE_SERVICE_ROLE_KEY` or `GEMINI_API_KEY` to the browser.
+- Do not generate medical diagnoses; document extraction must produce structured factual clinical information only.
 
 ---
 
 # CHANGE LOG
 
+## Phase 5 — Pre-Implementation Document Infrastructure Inspection (Completed)
+- Inspected existing schema: verified `documents`, `document_extractions`, `medical_timeline`, and `audit_logs` tables.
+- Inspected storage configuration: verified private `medical-documents` bucket (15 MB limit, restricted MIME types).
+- Inspected RLS policies: confirmed server-mediated architecture; authenticated physicians have read access; direct client uploads revoked.
+- Confirmed zero database migrations or RLS modifications are needed for Phase 5.
+- Formulated Phase 5 implementation plan and verification criteria.
+
+## Checkpoint 6 — Live Supabase Physician Queue & Case Review (Completed)
+- Implemented `getPhysicianQueueAction` in `src/app/actions/doctor.ts` querying live `clinical_sessions`, `patients`, and `triage_alerts`.
+- Implemented clinical priority sorting in physician queue (`emergency` top-ranked, then `urgent`, then recency).
+- Connected `/doctor/patients/page.tsx` to live Supabase queue data with emergency badges and filter stats.
+- Implemented `getPhysicianCaseDetailAction` in `src/app/actions/doctor.ts` with lookup by UUID, session code, or demo slug.
+- Connected `/doctor/patients/[id]/page.tsx` to live encounter data, rendering patient profile, critical red-flag alert banner, chronological Q&A with modality (`voice_browser`, `text`) and language tags.
+- Authored automated test suite `scripts/test-physician-queue.ts` (8/8 tests passed).
+
+## Phase 4 — Deterministic Clinical Safety & Red-Flag Triage Engine (Completed)
+- Implemented deterministic clinical triage evaluator in `src/lib/clinical/triage.ts`.
+- Created `RULE_CARDIAC_CHEST_PAIN` evaluating chest pain/tightness + diaphoresis, dyspnea, left radiation, or severe intensity across English, Hindi, and Marathi.
+- Integrated safety evaluation into `saveIntakeAnswerAction` with strict persistence ordering (answer saved to DB before triage evaluation).
+- Implemented automatic priority escalation (`clinical_sessions.priority = 'emergency'`) upon red-flag detection.
+- Implemented server-mediated alert persistence in `triage_alerts` with idempotent duplicate prevention.
+- Added non-diagnostic patient safety advisory alert to kiosk UI.
+- Authored automated test suite `scripts/test-triage.ts` (8/8 tests passed).
+
+## Phase 2 — Multilingual Voice & Patient Intake Experience (Completed)
+- Created 7-step patient intake experience with persistent session state in `src/context/IntakeContext.tsx`.
+- Implemented server actions `createOrResumeSessionAction` and `saveIntakeAnswerAction` in `src/app/actions/intake.ts`.
+- Built browser voice input component utilizing Web Speech API with real-time listening indicators and editable fallback.
+- Implemented Gemini conversational question generation in `src/lib/ai/gemini-provider.ts`.
+- Implemented deterministic question fallback in `src/lib/ai/mock-provider.ts` for English, Hindi, and Marathi.
+
 ## Phase 1C — Synthetic Demo Seed & Storage Fixture Deployment (Completed)
-- Generated valid synthetic PDF fixture (`supabase/fixtures/lab_report_glycemic_aug2026.pdf`, 1,543 bytes, SHA-256: `144ecbad985ed991bae0b5b58657322f6d115c01dd9b3be52aaa10188d32b88d`).
-- Uploaded fixture to private Supabase Storage bucket (`medical-documents`) at exact path `patients/c2000000-0000-0000-0000-000000000002/sessions/c2000000-0000-0000-0000-000000000010/lab_report_glycemic_aug2026.pdf` using Supabase CLI with `--experimental` flag.
-- Executed `supabase/seed.sql` populating all 12 core tables across 3 cohesive synthetic journeys (43 total rows).
-- Verified exact row counts via read-only SQL queries: 3 patients, 3 sessions, 3 consents, 6 questions, 6 answers, 3 histories, 1 triage alert, 1 document, 1 document extraction, 4 timeline events, 1 physician review, 11 audit logs.
-- Confirmed database document metadata matches physical storage object byte-for-byte (1,543 bytes) and hash-for-hash.
+- Generated synthetic PDF fixture (`lab_report_glycemic_aug2026.pdf`, 1,543 bytes).
+- Uploaded fixture to private Supabase Storage bucket (`medical-documents`).
+- Populated all 12 tables via `supabase/seed.sql` across 3 demo cases (43 total rows).
+- Confirmed database document metadata matches physical storage object byte-for-byte and hash-for-hash.
 - Confirmed 0 migration drift via `npx supabase db push --dry-run`.
 
 ## Phase 1C — Remote Database Migration Execution (Completed)
-- Resolved PostgreSQL 42501 ownership error by safely removing `ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;` from `supabase/migrations/20260908003600_initial_schema.sql`.
-- Completed comprehensive preflight verification across syntax, token balance, and foreign table/column references.
-- Executed `npx supabase db push --dry-run` and live `npx supabase db push --yes`.
-- Successfully deployed both migration suites to the remote Supabase project:
-  - `20260908003600_initial_schema.sql` (12 core tables, PKs, constraints, triggers, indexes, and `medical-documents` storage bucket)
-  - `20260908005000_harden_rls.sql` (hardened RLS policies, zero direct anon access to clinical data, append-only audit log)
-- Verified remote migration ledger confirms both migrations applied with exit code 0.
+- Resolved PostgreSQL 42501 ownership error in `initial_schema.sql`.
+- Deployed migrations `20260908003600_initial_schema.sql` and `20260908005000_harden_rls.sql` to remote Supabase project.
 
-## Phase 1B — Database Migration, Security Audit & RLS Hardening (Prepared & Validated)
-- Authored initial migration in `supabase/migrations/20260908003600_initial_schema.sql` (12 core PostgreSQL tables with UUID PKs, check constraints, foreign-key indexes, triggers, and private storage bucket).
-- Created Supabase CLI configuration in `supabase/config.toml`.
-- Conducted exhaustive pre-execution security audit documented in `docs/PHASE_1B_SECURITY_REVIEW.md` (flagged 2 critical RLS issues and 3 high-risk anonymous access policies).
-- Authored and statically validated RLS hardening migration in `supabase/migrations/20260908005000_harden_rls.sql`:
-  - Revoked direct anonymous SELECT and mutation permissions across all sensitive clinical tables (`patients`, `clinical_sessions`, `consents`, `clinical_answers`, `clinical_histories`, `triage_alerts`, `documents`, `document_extractions`, `medical_timeline`).
-  - Transitioned patient intake data transactions to the Server-Mediated Kiosk Pattern (Next.js Server Actions with service role).
-  - Restricted `clinical_questions` to read-only presentation for active questions.
-  - Constrained Supabase Storage uploads to strict path hierarchy `patients/{id}/sessions/{id}/`.
-  - Implemented medical record non-repudiation for verified physician reviews and clinical histories (blocking overwrite unless explicitly amended).
-  - Maintained strictly append-only audit logging.
+## Phase 1B — Database Migration, Security Audit & RLS Hardening (Completed)
+- Authored 12 core tables in `initial_schema.sql`.
+- Conducted security review in `docs/PHASE_1B_SECURITY_REVIEW.md`.
+- Implemented RLS hardening in `harden_rls.sql` establishing Server-Mediated Kiosk pattern.
 
-## Phase 1A — Database Schema Design
-- Authored comprehensive architectural specification in `docs/PHASE_1A_DATABASE_SCHEMA.md`.
-- Specified 12 core tables (`patients`, `consents`, `clinical_sessions`, `clinical_questions`, `clinical_answers`, `clinical_histories`, `triage_alerts`, `documents`, `document_extractions`, `medical_timeline`, `physician_reviews`, `audit_logs`).
-- Designed private Supabase Storage architecture for medical documents.
-- Designed deterministic safety and red-flag escalation table structure.
-- Removed persisted patient age; designated runtime calculation from `date_of_birth`.
-- Formulated application-optimized relational schema with dedicated FHIR R4 transformation layer strategy.
+## Phase 1A — Database Schema Design (Completed)
+- Authored architectural specification in `docs/PHASE_1A_DATABASE_SCHEMA.md`.
 
-## Phase 0 — Foundation UI and Application Shell
-- Installed minimal UI dependencies: `lucide-react`, `clsx`, `tailwind-merge`.
-- Configured clinical design system tokens in `src/app/globals.css`.
-- Created UI primitives (`Button`, `Card`, `Badge`, `Input`, `LoadingState`, `EmptyState`, `ErrorState`) in `src/components/ui/`.
-- Created layout components (`Navbar`, `Footer`, `PageContainer`) in `src/components/layout/`.
-- Implemented professional landing page for MediKiosk in `src/app/page.tsx`.
-- Implemented Patient Experience layout and route shells under `src/app/patient/`.
-- Implemented Physician Experience layout and route shells under `src/app/doctor/`.
-- Verified type safety and linting with 0 errors and 0 warnings.
-- Verified Next.js 16 production build generating all 15 static/dynamic routes.
-
-## Initial Setup
-- Project initialized and pushed to GitHub.
+## Phase 0 — Foundation UI and Application Shell (Completed)
+- Initialized UI primitives, layout components, landing page, patient routes, and physician routes.
