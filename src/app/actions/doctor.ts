@@ -27,6 +27,7 @@ import {
   CanonicalEncounterRecord,
 } from "@/lib/clinical/canonical-record";
 import { evaluateDocumentPatientRelevance } from "@/lib/ai/document-extractor";
+import { getActivePhysicianSession } from "@/lib/auth/physician-session";
 
 export interface GetPhysicianQueueResult {
   success: boolean;
@@ -40,6 +41,15 @@ export interface GetPhysicianQueueResult {
  */
 export async function getPhysicianQueueAction(): Promise<GetPhysicianQueueResult> {
   try {
+    const physicianSession = await getActivePhysicianSession();
+    if (!physicianSession) {
+      return {
+        success: false,
+        queue: [],
+        error: "Unauthorized: Active physician session required.",
+      };
+    }
+
     const supabase = createServerAdminClient();
 
     const { data: sessions, error } = await supabase
@@ -144,6 +154,14 @@ export async function getPhysicianCaseDetailAction(
   idOrCode: string
 ): Promise<GetPhysicianCaseDetailResult> {
   try {
+    const physicianSession = await getActivePhysicianSession();
+    if (!physicianSession) {
+      return {
+        success: false,
+        error: "Unauthorized: Active physician session required.",
+      };
+    }
+
     const supabase = createServerAdminClient();
 
     if (!idOrCode) {
@@ -462,6 +480,14 @@ export async function getCanonicalEncounterJsonAction(
   sessionId: string
 ): Promise<{ success: boolean; record?: CanonicalEncounterRecord | null; error?: string }> {
   try {
+    const physicianSession = await getActivePhysicianSession();
+    if (!physicianSession) {
+      return {
+        success: false,
+        error: "Unauthorized: Active physician session required.",
+      };
+    }
+
     const record = await buildCanonicalClinicalRecord(sessionId);
     return { success: true, record };
   } catch (err) {

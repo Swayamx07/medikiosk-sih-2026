@@ -10,11 +10,18 @@ export function middleware(request: NextRequest) {
   if (pathname.startsWith("/doctor")) {
     // Exclude the login page itself to prevent redirect loops
     if (pathname === "/doctor/login") {
-      // If physician is already logged in, redirect them directly to the physician queue
+      // If physician is already logged in, redirect to requested route or /doctor
       const existingSession = request.cookies.get(PHYSICIAN_COOKIE_NAME)?.value;
       if (existingSession && existingSession.includes(".")) {
-        const queueUrl = new URL("/doctor/patients", request.url);
-        return NextResponse.redirect(queueUrl);
+        const rawRedirect = request.nextUrl.searchParams.get("redirect");
+        const isValidRedirect =
+          rawRedirect &&
+          rawRedirect.startsWith("/doctor") &&
+          !rawRedirect.startsWith("//") &&
+          rawRedirect !== "/doctor/login";
+        const target = isValidRedirect ? rawRedirect : "/doctor";
+        const redirectUrl = new URL(target, request.url);
+        return NextResponse.redirect(redirectUrl);
       }
       return NextResponse.next();
     }
@@ -59,6 +66,16 @@ export function middleware(request: NextRequest) {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+
+  // Prevent browser caching and history/bfcache exposure for protected physician pages
+  if (pathname.startsWith("/doctor") && pathname !== "/doctor/login") {
+    response.headers.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    );
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("Expires", "0");
+  }
 
   return response;
 }

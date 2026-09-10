@@ -21,10 +21,10 @@ export default function Home() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative overflow-hidden border-b border-slate-200 bg-white py-16 sm:py-24">
+        <section className="relative overflow-hidden border-b border-slate-200 bg-white py-10 sm:py-14">
           <PageContainer size="xl">
             <div className="mx-auto max-w-3xl text-center">
-              <div className="mb-4 inline-flex items-center gap-2">
+              <div className="mb-3 inline-flex items-center gap-2">
                 <Badge variant="outline" className="border-sky-300 bg-sky-50 text-sky-800 text-xs px-3 py-1">
                   Smart India Hackathon 2026
                 </Badge>
@@ -33,24 +33,24 @@ export default function Home() {
                 </Badge>
               </div>
 
-              <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+              <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-5xl">
                 MediKiosk
               </h1>
 
-              <p className="mt-3 text-lg font-semibold tracking-tight text-sky-700 sm:text-xl">
+              <p className="mt-2 text-lg font-semibold tracking-tight text-sky-700 sm:text-xl">
                 AI-Powered Patient Case Taking
               </p>
 
-              <p className="mt-2 text-sm font-bold uppercase tracking-widest text-slate-500">
+              <p className="mt-1.5 text-sm font-bold uppercase tracking-widest text-slate-500">
                 &ldquo;Capture. Structure. Review.&rdquo;
               </p>
 
-              <p className="mt-6 text-base text-slate-600 sm:text-lg leading-relaxed">
+              <p className="mt-4 text-base text-slate-600 sm:text-lg leading-relaxed">
                 MediKiosk transforms unstructured, multilingual patient information into a coherent, structured clinical case for physician review. By capturing clinical history prior to consultation, MediKiosk ensures physicians never start from zero.
               </p>
 
               {/* Primary Entry Points */}
-              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/patient"
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-lg bg-slate-900 px-8 py-4 text-base font-medium text-white shadow-sm hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 transition-all active:scale-[0.99]"
@@ -70,7 +70,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="mt-8 flex items-center justify-center gap-6 text-xs text-slate-500">
+              <div className="mt-6 flex items-center justify-center gap-6 text-xs text-slate-500">
                 <span className="flex items-center gap-1.5">
                   <ShieldCheck className="h-4 w-4 text-emerald-600" />
                   Zero autonomous diagnosis

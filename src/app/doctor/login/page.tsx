@@ -30,7 +30,14 @@ import { Suspense } from "react";
 function DoctorLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get("redirect") || "/doctor/patients";
+  const rawRedirect = searchParams.get("redirect");
+  const isValidRedirect = Boolean(
+    rawRedirect &&
+      rawRedirect.startsWith("/doctor") &&
+      !rawRedirect.startsWith("//") &&
+      rawRedirect !== "/doctor/login"
+  );
+  const redirectTarget = isValidRedirect ? (rawRedirect as string) : "/doctor";
   const isExpired = searchParams.get("expired") === "1";
 
   const [physicianId, setPhysicianId] = useState("");
