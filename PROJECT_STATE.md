@@ -7,47 +7,57 @@
 
 # CURRENT PHASE
 
-POST-PHASE 5 CLINICAL FOUNDATIONS & PHYSICIAN SECURITY HARDENING COMPLETE — PRODUCTION-READY CHECKPOINT
+PHASE 6 — FHIR R4 / INTEROPERABILITY COMPLETE — PRODUCTION-READY CHECKPOINT
 
 ---
 
 # CURRENT TASK
 
-Physician Security Hardening & Home UI Finalization Complete (Commit `b1b1989`):
-1. **Physician Portal Access Control & Hardening**:
-   - Cryptographic HMAC-SHA256 session token management (`src/lib/auth/physician-session.ts`).
-   - Edge-compatible route guard in `src/middleware.ts` intercepting all `/doctor/*` routes.
-   - Unauthenticated visits redirected to `/doctor/login?redirect=...`.
-   - Safe internal redirect parameter validation to prevent open-redirect vulnerabilities, defaulting to `/doctor`.
-   - Server-side `getActivePhysicianSession()` verification enforced across physician server actions (`getPhysicianQueueAction`, `getPhysicianCaseDetailAction`, `getCanonicalEncounterJsonAction`).
-   - Session invalidation on sign-out via `logoutPhysicianAction`.
-   - `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` and `Pragma: no-cache` headers on protected doctor routes preventing browser history/bfcache exposure.
-   - `SUPABASE_SERVICE_ROLE_KEY` verified server-only; never imported into client components or exposed to browser.
-2. **Clinical Functionality Intact & Preserved**:
-   - 7-step patient kiosk journey (`/patient/*`).
-   - Multilingual conversational interview in English, Hindi, and Marathi.
-   - Informed consent with timestamping and patient demographics identification (ABHA ID / demo cases).
-   - Browser voice and text intake with real-time feedback.
-   - Non-diagnostic chief complaint cleaning and multilingual semantic validation (`cleanChiefComplaint`).
-   - Document upload, MIME/size validation, and private Supabase storage persistence.
-   - Multimodal OCR clinical entity extraction (Gemini Vision + deterministic medical fallback).
-   - Document-patient relevance verification (`verified`, `insufficient_info`, `mismatch`).
-   - Provenance-anchored conversation structuring (symptoms, conditions, medications, allergies linked to kiosk step & verbatim quote).
-   - Encounter-level canonical clinical JSON contract (`CanonicalEncounterRecord`).
-   - Deterministic clinical safety and red-flag triage engine (`RULE_CARDIAC_CHEST_PAIN`).
-   - Physician queue and interactive case review with canonical JSON viewer.
-3. **Home Page UI Checkpoint**:
-   - "Start Patient Intake" remains the dominant, high-contrast primary CTA.
-   - "Attending Medical Staff Portal →" placed directly below the primary CTA (`mt-4`) as a subtle secondary text link.
-   - Portal link sits at `~450px` from document top, visible within the initial 1366×768 desktop viewport without scrolling.
-   - Trust badges (`Zero autonomous diagnosis`, `FHIR R4 Ready`) placed below the portal link.
-   - Zero modifications to clinical, security, or backend logic for this UI refinement.
-4. **All Verifications Passing**:
+Phase 6 — FHIR R4 / Interoperability Layer Complete (Commit `691083e`):
+1. **FHIR R4 Type Contracts & Architecture (Checkpoint 6.1)**:
+   - Minimal dependency-free TypeScript interfaces for HL7 FHIR Release 4 (R4) data structures (`src/types/fhir-r4.ts`).
+   - Supports: `Bundle`, `Patient`, `Encounter`, `Condition`, `Observation`, `MedicationStatement`, `AllergyIntolerance`, `DocumentReference`, `RiskAssessment`, plus reusable primitives (`Identifier`, `HumanName`, `ContactPoint`, `CodeableConcept`, `Coding`, `Reference`, `Period`, `Quantity`, `Annotation`, `Meta`).
+   - Zero external FHIR packages; zero terminology system fabrication.
+2. **Deterministic CanonicalEncounterRecord → FHIR R4 Mapper (Checkpoint 6.2)**:
+   - Implemented pure functional mapper `mapCanonicalToFhirBundle(record: CanonicalEncounterRecord): FhirBundle` (`src/lib/clinical/fhir-mapper.ts`).
+   - Pure function: zero database, zero network, zero side effects; identical input produces identical output.
+   - Closed internal URN reference strategy (`urn:uuid:...`) resolving all cross-references (`subject`, `encounter`, `context`, `patient`, `basis`).
+   - Zero dummy resources emitted for sparse/empty data (guaranteed via mapper rules).
+   - Conservative clinical semantics: patient-reported findings map to `unconfirmed` verification status; physician review promotes to `confirmed`.
+   - Free-text clinical concepts truthfully populate `CodeableConcept.text` without synthetic LOINC/SNOMED CT/ICD-10/RxNorm/UCUM codes.
+   - Non-numeric lab results safely map to `Observation.valueString`; pure numeric results map to `valueQuantity` without synthetic UCUM symbols.
+   - Medication history maps exclusively to `MedicationStatement` (intake history); zero `MedicationRequest` orders.
+   - Allergies map to `AllergyIntolerance` using FHIR standard `patient` attribute (omits `subject`).
+   - Triage maps to `RiskAssessment` with explainable rules, rationale, and basis references strictly linking to emitted symptom Observations.
+3. **Automated Verification Suite (Checkpoint 6.3)**:
+   - Implemented offline automated test suite `scripts/test-fhir-mapper.ts` (10/10 tests passed).
+   - Tests: complete encounter mapping, closed reference integrity, no dummy resources, non-numeric labs, numeric labs, zero fabricated terminology, provenance preservation, allergy semantics, medication semantics, determinism.
+4. **Protected Physician Server Action (Checkpoint 6.4)**:
+   - Added `getEncounterFhirBundleAction(sessionId: string)` in `src/app/actions/doctor.ts`.
+   - Enforces HMAC session check via `getActivePhysicianSession()` before any database or transformation work.
+   - Reuses `buildCanonicalClinicalRecord(sessionId)` to load the canonical clinical record without duplicate logic.
+   - Validates `sessionId` and returns explicit errors for missing encounters (never silent empty bundles).
+   - Server-only execution; zero Supabase credentials or database internals exposed to browser.
+5. **Physician FHIR Bundle Viewer Component (Checkpoint 6.5)**:
+   - Implemented `src/components/doctor/FhirBundleViewer.tsx` (`use client`).
+   - Connects to `getEncounterFhirBundleAction(sessionId)` on mount.
+   - Computes dynamic resource summary counts directly from `bundle.entry[].resource.resourceType`.
+   - Interactive filtering by resource type (`All`, `Patient`, `Encounter`, `Condition`, `Observation`, `MedicationStatement`, `AllergyIntolerance`, `DocumentReference`, `RiskAssessment`).
+   - Scrollable monospaced JSON viewer with one-click local `Copy FHIR JSON` and `Export .fhir.json` file download.
+   - Explicit Clinical Safety Notice: "FHIR data is generated from the structured clinical record. Patient-reported and document-extracted information retains its source/verification status. This export does not represent an autonomous diagnosis."
+   - Handles loading, unauthorized, not-found, and generic error states with retry support.
+6. **Physician Patient-Detail Portal Integration (Checkpoint 6.6)**:
+   - Integrated `FhirBundleViewer` into `/doctor/patients/[id]/page.tsx` within `<section id="fhir-interoperability" aria-label="FHIR R4 Interoperability">`.
+   - Bound directly to `caseData.sessionId` and `caseData.sessionCode` of the active encounter.
+   - Updated case header action button to anchor jump directly to the live FHIR section.
+   - Existing `CanonicalJsonViewer` and clinical review components remain completely intact.
+7. **Final Verification & Checkpoint (Checkpoint 6.7)**:
    - `npm run lint` → PASS (0 errors, 0 warnings).
    - `npx tsc --noEmit` → PASS (0 compilation errors).
    - `npm run build` → PASS (16/16 routes generated cleanly).
+   - `npx tsx scripts/test-fhir-mapper.ts` → PASS (10/10 tests passed).
    - `npx tsx scripts/test-physician-auth.ts` → PASS (6/6 tests passed).
-   - Protected route and server action access controls verified.
+   - Committed and pushed to `origin/main` as commit `691083e`.
 
 ---
 
@@ -147,6 +157,34 @@ Physician Security Hardening & Home UI Finalization Complete (Commit `b1b1989`):
 - [x] Trust badges (`Zero autonomous diagnosis`, `FHIR R4 Ready`) placed below the portal link
 - [x] Zero changes to clinical, security, or backend logic
 
+### 11. FHIR R4 Interoperability Layer (Phase 6)
+- [x] Minimal dependency-free TypeScript interfaces for HL7 FHIR Release 4 (`src/types/fhir-r4.ts`)
+- [x] Pure deterministic mapper `mapCanonicalToFhirBundle()` (`src/lib/clinical/fhir-mapper.ts`)
+- [x] Closed internal reference architecture (`fullUrl: "urn:uuid:..."`) with zero dangling references
+- [x] Resources supported from canonical record:
+  - `Patient`: Demographics, ABHA ID identifier, BCP-47 language coding
+  - `Encounter`: Ambulatory class, outpatient service type, priority, chief complaint reasonCode
+  - `Observation`: Preliminary exam symptoms (with onset/duration/location components) and final laboratory findings (numeric `valueQuantity` vs qualitative `valueString`)
+  - `Condition`: Problem-list items for past medical history and document-extracted impressions
+  - `MedicationStatement`: Active medication intake history (patient-reported and prescription-extracted)
+  - `AllergyIntolerance`: Patient-reported allergens and manifestations
+  - `DocumentReference`: Uploaded file attachments with size, MIME type, and patient-relevance status
+  - `RiskAssessment`: Deterministic safety engine rules, rationale, and basis links to emitted symptoms
+- [x] Strict clinical and terminology boundaries:
+  - Zero synthetic LOINC, SNOMED CT, ICD-10, RxNorm, or UCUM codes fabricated
+  - Free-text clinical concepts truthfully populate `CodeableConcept.text`
+  - Provenance anchors (kiosk steps, verbatim quotes, OCR filenames, triage rules) preserved in notes
+  - Zero dummy resources emitted for sparse/empty encounter data
+  - No autonomous diagnosis inference
+  - Bundle emitted as standard `collection` type
+- [x] Protected server action `getEncounterFhirBundleAction` in `src/app/actions/doctor.ts` with physician session validation
+- [x] Standalone physician viewer component `src/components/doctor/FhirBundleViewer.tsx` with dynamic badges, filter tabs, monospaced JSON viewer, local copy, and local `.fhir.json` file export
+- [x] Patient-detail portal integration in `src/app/doctor/patients/[id]/page.tsx`
+- [x] Automated test suite `scripts/test-fhir-mapper.ts` (10/10 tests passed)
+- [x] **Explicit Interoperability Boundary**:
+  - **IMPLEMENTED**: In-memory deterministic FHIR R4 serialization, protected generation action, physician viewer, JSON copy/export, patient detail page integration.
+  - **NOT IMPLEMENTED / FUTURE**: Live ABDM gateway integration, live HIS/EHR synchronization, terminology service integration, formal external FHIR validation/certification, production ABDM authentication/exchange workflows.
+
 ---
 
 # VERIFICATION STATUS
@@ -161,6 +199,7 @@ Physician Security Hardening & Home UI Finalization Complete (Commit `b1b1989`):
   - Tampered token rejection
   - Corrupt payload rejection
   - Empty / null token handling
+- [x] **FHIR Mapper Test Suite**: `npx tsx scripts/test-fhir-mapper.ts` PASSED (10/10 tests passed across complete encounter mapping, reference integrity, empty-case protection, and determinism)
 - [x] **Live Security & Middleware Verification**:
   - Unauthenticated `/doctor` → 307 redirect to `/doctor/login?redirect=%2Fdoctor`
   - Unauthenticated `/doctor/queue` → 307 redirect to `/doctor/login?redirect=%2Fdoctor%2Fqueue`
@@ -218,36 +257,28 @@ Connected and fully migrated on Supabase (12 tables, check constraints, hardened
 - Live Patient Intake Journey (Steps 1–7) fully functional with Supabase persistence.
 - Step 6 `/patient/interview` conversational intake with voice and Gemini/deterministic questions fully functional.
 - Step 6 `/patient/documents` fully functional with drag-and-drop upload, PDF/image validation, Supabase storage persistence, multimodal OCR extraction, patient-relevance verification, and clinical review integration.
-- Live Physician Queue (`/doctor/patients`) and Case Review (`/doctor/patients/[id]`) fully functional with live Supabase data, canonical JSON viewer, and active physician session authorization.
+- Live Physician Queue (`/doctor/patients`) and Case Review (`/doctor/patients/[id]`) fully functional with live Supabase data, canonical JSON viewer, interactive FHIR R4 Bundle viewer (with resource filtering, copy, and export), and active physician session authorization.
 
 ---
 
 # LAST VERIFIED
 
-Commit `b1b1989`: Physician access control hardening, server action protection, cache headers, and final home page viewport refinement verified end-to-end with automated test suites, linting (`npm run lint`), type-checking (`npx tsc --noEmit`), and production build (`npm run build`).
+Commit `691083e`: Phase 6 FHIR R4 Interoperability layer, protected server action, physician viewer, and patient-detail integration verified end-to-end with automated test suites (test-fhir-mapper.ts 10/10, test-physician-auth.ts 6/6), linting (npm run lint 0 errors), type-checking (npx tsc --noEmit 0 errors), and production build (npm run build 16/16 routes).
 
 ---
 
 # ACTIVE ROADMAP PHASE
 
-PHASE 6 — FHIR R4 / INTEROPERABILITY (PLANNED / NOT IMPLEMENTED)
+PHASE 6 — FHIR R4 / INTEROPERABILITY: COMPLETED
 
-**Planned Scope Only**:
-- Inspect the existing `CanonicalEncounterRecord` data contract.
-- Design a FHIR R4 mapping layer around the existing clinical record without altering clinical intake or schema.
-- Map appropriate standard FHIR R4 resources where supported by existing data:
-  - `Patient` (demographics, ABHA identifier)
-  - `Encounter` (class, status, service provider)
-  - `Condition` (chief complaint, past medical conditions, document-extracted conditions)
-  - `Observation` (symptoms, extracted lab results with values and reference ranges)
-  - `MedicationStatement` / `MedicationRequest` (patient-reported and document-extracted medications)
-  - `AllergyIntolerance` (patient-reported allergens and reactions)
-  - `DocumentReference` (uploaded medical records and checksums)
-  - `RiskAssessment` (deterministic red-flag triage findings)
-- Provide a physician-facing FHIR JSON/Bundled representation and download/export capability on `/doctor/interoperability` and case review.
-- Maintain ABDM (Ayushman Bharat Digital Mission) / Hospital Information System (HIS) integration as an architectural adapter/readiness pathway unless live integration is implemented.
-- **Explicit Boundary**: Do NOT claim live ABDM integration. Do NOT claim production FHIR interoperability until actually implemented and tested.
-- Do NOT introduce offline-first, HAPI FHIR, Redis, XGBoost, Ollama, Keycloak, or alternative technologies from outside the approved stack.
+NEXT ACTIVE ROADMAP PHASE: PHASE 7 — PHYSICIAN VERIFICATION
+
+**Roadmap Sequence**:
+1. Phase 6 — FHIR R4 / Interoperability (COMPLETED — Commit `691083e`)
+2. Phase 7 — Physician Verification (NEXT)
+3. Phase 8 — Risk / Triage Visualization
+4. Phase 9 — Provenance + Audit UX
+5. Phase 10 — Offline / Deployment Hardening
 
 ---
 
@@ -265,6 +296,31 @@ PHASE 6 — FHIR R4 / INTEROPERABILITY (PLANNED / NOT IMPLEMENTED)
 ---
 
 # CHANGE LOG
+
+## Phase 6 — FHIR R4 Interoperability Layer (Commit 691083e) (Completed)
+- **FHIR R4 Type Contracts & Architecture**:
+  - Authored minimal, dependency-free TypeScript interfaces for HL7 FHIR Release 4 (`src/types/fhir-r4.ts`).
+  - Supported: `Bundle`, `Patient`, `Encounter`, `Condition`, `Observation`, `MedicationStatement`, `AllergyIntolerance`, `DocumentReference`, `RiskAssessment`, and core primitives.
+- **Deterministic Pure Mapper**:
+  - Implemented `mapCanonicalToFhirBundle()` in `src/lib/clinical/fhir-mapper.ts` as a pure functional transform from `CanonicalEncounterRecord` to `FhirBundle` (`collection` type).
+  - Closed internal reference resolution (`urn:uuid:...`) without dangling references.
+  - Zero fabricated LOINC, SNOMED CT, ICD-10, RxNorm, or UCUM codes; clinical concepts truthfully populate `CodeableConcept.text`.
+  - Zero dummy resources emitted for sparse/empty encounter data.
+- **Protected Physician Server Action**:
+  - Implemented `getEncounterFhirBundleAction(sessionId)` in `src/app/actions/doctor.ts` with `getActivePhysicianSession()` session enforcement.
+  - Reuses `buildCanonicalClinicalRecord()` without duplicating canonical construction logic.
+- **Physician FHIR Bundle Viewer**:
+  - Built `src/components/doctor/FhirBundleViewer.tsx` with dynamic resource counts, interactive resource filtering, monospaced JSON viewer, local copy, local `.fhir.json` download, and clinical safety notice.
+- **Physician Portal Integration**:
+  - Integrated `FhirBundleViewer` into `/doctor/patients/[id]/page.tsx` bound to `caseData.sessionId`.
+  - Added header action button anchor jump to `#fhir-interoperability`.
+- **Verification & Checkpoint**:
+  - `npx tsx scripts/test-fhir-mapper.ts` PASSED (10/10 tests passed).
+  - `npx tsx scripts/test-physician-auth.ts` PASSED (6/6 tests passed).
+  - `npm run lint` PASSED (0 errors, 0 warnings).
+  - `npx tsc --noEmit` PASSED (0 errors).
+  - `npm run build` PASSED (16/16 routes generated cleanly).
+  - Committed and pushed to `origin/main` as commit `691083e`.
 
 ## Checkpoint — Physician Security Hardening & Home UI Finalization (Commit b1b1989) (Completed)
 - **Physician Portal Security Hardening**:
