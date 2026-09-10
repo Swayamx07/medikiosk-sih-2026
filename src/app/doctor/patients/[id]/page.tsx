@@ -26,15 +26,15 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardFooter,
 } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { getPhysicianCaseDetailAction } from "@/app/actions/doctor";
 import { getDocumentSignedUrlAction } from "@/app/actions/documents";
 import { CanonicalJsonViewer } from "@/components/doctor/CanonicalJsonViewer";
 import { FhirBundleViewer } from "@/components/doctor/FhirBundleViewer";
+import { PhysicianHeaderVerifyButton } from "@/components/doctor/PhysicianHeaderVerifyButton";
+import { PhysicianReviewCard } from "@/components/doctor/PhysicianReviewCard";
 
 interface PatientCasePageProps {
   params: Promise<{ id: string }>;
@@ -106,6 +106,9 @@ export default async function PatientCaseDetailPage({
   const caseData = result.caseDetail;
   const isEmergency =
     caseData.priority === "emergency" || caseData.hasCriticalRedFlag;
+  const isVerified =
+    caseData.status === "verified" ||
+    Boolean(caseData.physicianReview?.isVerified);
 
   // Resolve signed URLs for uploaded medical records
   const signedUrls: Record<string, string> = {};
@@ -145,11 +148,24 @@ export default async function PatientCaseDetailPage({
                 </Badge>
               ) : caseData.priority === "urgent" ? (
                 <Badge variant="warning" className="text-xs">
-                  Urgent
+                  Urgent Priority
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="text-xs">
-                  Standard Review
+                  Standard Priority
+                </Badge>
+              )}
+              {isVerified ? (
+                <Badge variant="success" className="gap-1 text-xs shadow-xs">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-700" />
+                  Physician Verified
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="text-xs text-amber-800 border-amber-300 bg-amber-50"
+                >
+                  Awaiting Review
                 </Badge>
               )}
             </div>
@@ -170,10 +186,12 @@ export default async function PatientCaseDetailPage({
             <Share2 className="h-3.5 w-3.5 text-sky-600" />
             <span>FHIR R4 Bundle</span>
           </a>
-          <Button variant="primary" size="sm" className="gap-1.5" disabled>
-            <CheckCircle2 className="h-3.5 w-3.5 text-sky-400" />
-            <span>Verify &amp; Accept (Phase 7)</span>
-          </Button>
+          <PhysicianHeaderVerifyButton
+            sessionId={caseData.sessionId}
+            isVerified={isVerified}
+            verifiedByName={caseData.physicianReview?.physicianName}
+            verifiedAt={caseData.physicianReview?.verifiedAt}
+          />
         </div>
       </div>
 
@@ -230,9 +248,14 @@ export default async function PatientCaseDetailPage({
                   <FileText className="h-4 w-4 text-sky-600" />
                   <CardTitle className="text-base">Recorded Chief Complaint</CardTitle>
                 </div>
-                <Badge variant="outline" className="text-xs capitalize">
-                  {caseData.mode} OPD
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="outline" className="text-[10px] text-sky-800 bg-sky-50 border-sky-200">
+                    Source: Patient Dialogue
+                  </Badge>
+                  <Badge variant="outline" className="text-xs capitalize">
+                    {caseData.mode} OPD
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -281,10 +304,41 @@ export default async function PatientCaseDetailPage({
                 {/* HPI Summary Narrative */}
                 {caseData.structuredFindings.hpiNarrative && (
                   <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-800 leading-relaxed">
-                    <span className="font-semibold text-slate-900 block mb-1 text-[11px] uppercase tracking-wider">
-                      History of Present Illness (Synthesized)
-                    </span>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-semibold text-slate-900 text-[11px] uppercase tracking-wider">
+                        History of Present Illness (AI Synthesized)
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] text-slate-500 border-slate-300 bg-white"
+                      >
+                        System Synthesis (Pre-Verification)
+                      </Badge>
+                    </div>
                     <p>{caseData.structuredFindings.hpiNarrative}</p>
+                  </div>
+                )}
+
+                {/* Physician-Amended Clinical Summary (if present) */}
+                {caseData.physicianReview?.editedClinicalSummary && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-950 leading-relaxed">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-semibold text-amber-900 text-[11px] uppercase tracking-wider flex items-center gap-1">
+                        <Sparkles className="h-3 w-3 text-amber-600" />
+                        <span>Physician-Amended Clinical Narrative (Verified Review)</span>
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] text-amber-800 border-amber-300 bg-white font-medium"
+                      >
+                        Signed off by{" "}
+                        {caseData.physicianReview.physicianName || "Physician"}
+                      </Badge>
+                    </div>
+                    <p>{caseData.physicianReview.editedClinicalSummary}</p>
+                    <p className="text-[10px] text-amber-800/80 mt-1.5 italic border-t border-amber-200/60 pt-1">
+                      Physician-edited summary recorded under authenticated session. Raw kiosk dialogue remains preserved.
+                    </p>
                   </div>
                 )}
 
@@ -894,12 +948,27 @@ export default async function PatientCaseDetailPage({
                   {caseData.priority}
                 </span>
               </div>
-              <div className="flex justify-between pb-2 border-b border-slate-100">
+              <div className="flex justify-between pb-2 border-b border-slate-100 items-center">
                 <span className="text-slate-500">Encounter Status:</span>
-                <span className="font-medium text-slate-800 capitalize">
-                  {caseData.status.replace(/_/g, " ")}
-                </span>
+                {isVerified ? (
+                  <Badge variant="success" className="text-[10px] gap-1 shadow-2xs">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                    Verified
+                  </Badge>
+                ) : (
+                  <span className="font-medium text-slate-800 capitalize">
+                    {caseData.status.replace(/_/g, " ")}
+                  </span>
+                )}
               </div>
+              {isVerified && caseData.physicianReview?.verifiedAt && (
+                <div className="flex justify-between pb-2 border-b border-slate-100">
+                  <span className="text-slate-500">Verified At:</span>
+                  <span className="font-medium text-slate-700">
+                    {formatDateTime(caseData.physicianReview.verifiedAt)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between pb-2 border-b border-slate-100">
                 <span className="text-slate-500">Started At:</span>
                 <span className="font-medium text-slate-700">
@@ -916,40 +985,15 @@ export default async function PatientCaseDetailPage({
           </Card>
 
           {/* Physician Review & Verification Card */}
-          <Card className="border-slate-200">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-slate-600" />
-                  <CardTitle className="text-base">Review Protocol</CardTitle>
-                </div>
-                <Badge
-                  variant={caseData.status === "verified" ? "success" : "secondary"}
-                  className="text-[10px]"
-                >
-                  {caseData.status === "verified" ? "Verified ✓" : "Pending Sign-off"}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3 text-xs text-slate-600">
-              <p className="leading-relaxed">
-                All patient conversational answers and triage alerts are captured directly from the patient kiosk.
-              </p>
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-2.5 text-[11px] text-slate-500 space-y-1">
-                <span className="font-semibold text-slate-700 block">
-                  Clinical Audit Guard:
-                </span>
-                <span>
-                  Verification and immutable EHR sign-off will be activated in Phase 7.
-                </span>
-              </div>
-            </CardContent>
-            <CardFooter className="border-t border-slate-100 pt-3 flex justify-end">
-              <Button variant="outline" size="sm" disabled>
-                Sign Off Encounter (Phase 7)
-              </Button>
-            </CardFooter>
-          </Card>
+          <PhysicianReviewCard
+            sessionId={caseData.sessionId}
+            sessionCode={caseData.sessionCode}
+            status={caseData.status}
+            initialSummary={
+              caseData.structuredFindings?.hpiNarrative || null
+            }
+            physicianReview={caseData.physicianReview}
+          />
         </div>
       </div>
     </div>

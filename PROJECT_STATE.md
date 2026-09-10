@@ -7,11 +7,49 @@
 
 # CURRENT PHASE
 
-PHASE 6 — FHIR R4 / INTEROPERABILITY COMPLETE — PRODUCTION-READY CHECKPOINT
+PHASE 7 — PHYSICIAN VERIFICATION & NON-REPUDIATION COMPLETE — PRODUCTION-READY CHECKPOINT
 
 ---
 
 # CURRENT TASK
+
+Phase 7 — Physician Verification Lifecycle Complete (Phases 7.1–7.7):
+1. **Discovery & Architecture Alignment (Checkpoint 7.1)**:
+   - Inspected `physician_reviews`, `clinical_sessions`, `clinical_histories`, `audit_logs`, `canonical-record.ts`, and FHIR layer.
+   - Identified verified state representations and confirmed non-repudiation and provenance requirements.
+2. **Physician Verification Data Contracts & Types (Checkpoint 7.2)**:
+   - Defined `PhysicianVerificationPayload`, `VerifyEncounterResult`, `PhysicianReviewRecord`, and `ClinicalReconciliationItem` in `src/types/clinical.ts`.
+   - Strictly typed `reviewStatus` union (`PhysicianReviewStatus`) and made `updatedValue` optional for removed clinical items.
+3. **Protected Physician Verification Server Action (Checkpoint 7.3)**:
+   - Implemented `verifyAndSignOffEncounterAction` in `src/app/actions/doctor.ts`.
+   - Enforces HMAC session authentication (`getActivePhysicianSession()`), server-controlled identity/timestamp, payload validation, and non-repudiation lock.
+   - Uses ordered multi-table persistence with compensating rollback. (Note: Database-level atomicity is not currently available because no transaction/RPC mechanism exists in Supabase).
+4. **Audit Logging & Provenance Integration (Checkpoint 7.4)**:
+   - Wired `provenance.sources.physicianVerification` and `provenance.verificationStatus` into `CanonicalEncounterRecord`.
+   - Appends single immutable `case_verified` audit event in `audit_logs` with actor `physician` and privacy-safe metadata without narrative exposure.
+5. **Interactive Physician Verification UI (Checkpoint 7.5)**:
+   - Built `PhysicianHeaderVerifyButton`, `PhysicianVerificationModal`, and `PhysicianReviewCard` under `src/components/doctor/`.
+   - Replaced Phase 7 placeholder buttons with active modal workflow capturing clinical notes, summary amendments, and structured reconciliation.
+6. **Verified State & Non-Repudiation Display (Checkpoint 7.6)**:
+   - Replaced interactive sign-off triggers with immutable read-only badges on verified encounters.
+   - Prominently displays verified badge, verifying physician name/ID, timestamp, and legal lock banner.
+   - Clearly differentiates physician-amended narrative from system synthesis with distinct badges and callouts.
+   - Invokes `router.refresh()` upon verification to instantly update the UI.
+7. **End-to-End Verification & Automated Test Suite (Checkpoint 7.7)**:
+   - Created pure validation module `src/lib/clinical/verification-validator.ts` and automated test suite `scripts/test-physician-verification.ts` (95/95 tests passed, 100%).
+   - Re-verified all regression suites: FHIR mapper (10/10), physician auth (6/6), canonical JSON (38/38).
+   - Confirmed `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors, 0 warnings), `npm run build` (16/16 routes generated cleanly).
+
+---
+
+## Phase 7 — Physician Verification & Non-Repudiation Lifecycle (Completed)
+- **Data Contracts & Types**: Authored `PhysicianVerificationPayload`, `VerifyEncounterResult`, `PhysicianReviewRecord`, and `ClinicalReconciliationItem` in `src/types/clinical.ts`.
+- **Protected Action**: Authored `verifyAndSignOffEncounterAction` in `src/app/actions/doctor.ts` with strict session verification, server identity enforcement, payload validation, and compensating rollback.
+- **Provenance & Audit**: Linked canonical record `verificationStatus` and `audit_logs` append-only `case_verified` logging.
+- **Physician Portal UI**: Authored `PhysicianHeaderVerifyButton.tsx`, `PhysicianVerificationModal.tsx`, `PhysicianReviewCard.tsx`, and updated `/doctor/patients/[id]/page.tsx` and `/doctor/patients/page.tsx`.
+- **Automated Verification**: Authored `scripts/test-physician-verification.ts` with 95 comprehensive unit, contract, state transition, and security tests.
+
+---
 
 Phase 6 — FHIR R4 / Interoperability Layer Complete (Commit `691083e`):
 1. **FHIR R4 Type Contracts & Architecture (Checkpoint 6.1)**:

@@ -17,6 +17,11 @@ import {
   ExtractedPatientHeader,
   PatientRelevanceAssessment,
   ClinicalDomain,
+  PhysicianVerificationPayload,
+  VerifyEncounterResult,
+  PhysicianReconciliationChanges,
+  PhysicianReviewRecord,
+  PhysicianReviewStatus,
 } from "@/types/clinical";
 import {
   extractStructuredConversationEntities,
@@ -30,6 +35,7 @@ import { evaluateDocumentPatientRelevance } from "@/lib/ai/document-extractor";
 import { getActivePhysicianSession } from "@/lib/auth/physician-session";
 import { mapCanonicalToFhirBundle } from "@/lib/clinical/fhir-mapper";
 import { FhirBundle } from "@/types/fhir-r4";
+import { validateVerificationPayload } from "@/lib/clinical/verification-validator";
 
 export interface GetPhysicianQueueResult {
   success: boolean;
@@ -328,17 +334,39 @@ export async function getPhysicianCaseDetailAction(
     // Check existing physician verification review record
     const { data: review } = await supabase
       .from("physician_reviews")
-      .select("id, review_status, is_verified, edited_clinical_summary, physician_notes")
+      .select(`
+        id,
+        session_id,
+        patient_id,
+        physician_id,
+        physician_name,
+        review_status,
+        is_verified,
+        edited_clinical_summary,
+        physician_notes,
+        reconciliation_changes,
+        verified_at,
+        created_at,
+        updated_at
+      `)
       .eq("session_id", session.id)
       .maybeSingle();
 
-    const physicianReview = review
+    const physicianReview: PhysicianReviewRecord | null = review
       ? {
           id: review.id,
-          reviewStatus: review.review_status,
+          sessionId: review.session_id,
+          patientId: review.patient_id,
+          physicianId: review.physician_id,
+          physicianName: review.physician_name,
+          reviewStatus: review.review_status as PhysicianReviewStatus,
           isVerified: review.is_verified,
           editedClinicalSummary: review.edited_clinical_summary,
           physicianNotes: review.physician_notes,
+          reconciliationChanges: (review.reconciliation_changes as unknown) as PhysicianReconciliationChanges | null,
+          verifiedAt: review.verified_at,
+          createdAt: review.created_at,
+          updatedAt: review.updated_at,
         }
       : null;
 
@@ -547,6 +575,246 @@ export async function getEncounterFhirBundleAction(
     return {
       success: false,
       error: err instanceof Error ? err.message : "Failed to generate FHIR R4 bundle",
+    };
+  }
+}
+
+/**
+ * Protected Server Action: Executes official physician sign-off and verification
+ * for a clinical encounter.
+ *
+ * Security & Integrity Guarantees:
+ * 1. Requires active physician session (HMAC-SHA256 verified via getActivePhysicianSession()).
+ * 2. Physician identity is strictly server-controlled; never accepted from client inputs.
+ * 3. Enforces non-repudiation: encounters already marked verified cannot be re-verified.
+ * 4. Updates or inserts physician_reviews record (is_verified = true, review_status = 'verified_accepted').
+ * 5. Transitions clinical_sessions.status to 'verified'.
+ * 6. Transitions clinical_histories.summary_status to 'verified' (if history exists).
+ * 7. Records an append-only audit event in audit_logs (event_type = 'case_verified').
+ * 8. Leaves document_extractions bulk verification and FHIR cache decoupled as specified.
+ */
+export async function verifyAndSignOffEncounterAction(
+  payload: PhysicianVerificationPayload
+): Promise<VerifyEncounterResult> {
+  try {
+    // 1. Authenticate Physician Session
+    const physicianSession = await getActivePhysicianSession();
+    if (!physicianSession) {
+      return {
+        success: false,
+        error: "Unauthorized: Active physician session required.",
+      };
+    }
+
+    // 2. Validate Input Payload
+    const validation = validateVerificationPayload(payload);
+    if (!validation.isValid || !validation.cleanData) {
+      return {
+        success: false,
+        error: validation.error || "Invalid verification payload.",
+      };
+    }
+
+    const {
+      sessionId,
+      physicianNotes,
+      editedClinicalSummary,
+      reconciliationChanges,
+    } = validation.cleanData;
+
+    const supabase = createServerAdminClient();
+
+    // 3. Verify Encounter Existence & Eligibility
+    const { data: session, error: sessionErr } = await supabase
+      .from("clinical_sessions")
+      .select("id, session_code, patient_id, status")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (sessionErr || !session) {
+      return {
+        success: false,
+        error: "Clinical encounter record not found.",
+      };
+    }
+
+    if (session.status === "abandoned") {
+      return {
+        success: false,
+        error: "Encounter is abandoned and cannot be verified.",
+      };
+    }
+
+    if (session.status === "verified") {
+      return {
+        success: false,
+        error: "Encounter is already verified and cannot be verified again.",
+      };
+    }
+
+    // Check existing review to respect non-repudiation
+    const { data: existingReview, error: reviewCheckErr } = await supabase
+      .from("physician_reviews")
+      .select("id, review_status, is_verified")
+      .eq("session_id", session.id)
+      .maybeSingle();
+
+    if (reviewCheckErr) {
+      return {
+        success: false,
+        error: "Failed to inspect existing review state.",
+      };
+    }
+
+    if (existingReview?.is_verified) {
+      return {
+        success: false,
+        error: "Encounter is already verified and cannot be verified again.",
+      };
+    }
+
+    const verifiedAt = new Date().toISOString();
+
+    // 4. Create or Update physician_reviews Record
+    const reviewData = {
+      session_id: session.id,
+      patient_id: session.patient_id,
+      physician_id: physicianSession.physicianId,
+      physician_name: physicianSession.fullName,
+      review_status: "verified_accepted" as const,
+      is_verified: true,
+      verified_at: verifiedAt,
+      physician_notes: physicianNotes,
+      edited_clinical_summary: editedClinicalSummary,
+      reconciliation_changes: reconciliationChanges,
+    };
+
+    let insertedReviewId: string | null = null;
+    let reviewMutationError: string | null = null;
+
+    if (existingReview) {
+      const { error: updateReviewErr } = await supabase
+        .from("physician_reviews")
+        .update(reviewData)
+        .eq("id", existingReview.id);
+
+      if (updateReviewErr) {
+        reviewMutationError = updateReviewErr.message;
+      }
+    } else {
+      const { data: insertedReview, error: insertReviewErr } = await supabase
+        .from("physician_reviews")
+        .insert(reviewData)
+        .select("id")
+        .maybeSingle();
+
+      if (insertReviewErr) {
+        reviewMutationError = insertReviewErr.message;
+      } else if (insertedReview) {
+        insertedReviewId = insertedReview.id;
+      }
+    }
+
+    if (reviewMutationError) {
+      return {
+        success: false,
+        error: "Failed to persist physician review verification record.",
+      };
+    }
+
+    // 5. Update clinical_sessions Status to 'verified'
+    // NOTE: clinical_sessions.assigned_physician_id remains unchanged (verification != assignment)
+    const { error: sessionUpdateErr } = await supabase
+      .from("clinical_sessions")
+      .update({
+        status: "verified",
+        completed_at: verifiedAt,
+      })
+      .eq("id", session.id);
+
+    if (sessionUpdateErr) {
+      // Compensating rollback: Revert physician_reviews to prevent inconsistent verified state
+      if (existingReview) {
+        await supabase
+          .from("physician_reviews")
+          .update({
+            review_status: existingReview.review_status,
+            is_verified: existingReview.is_verified,
+            verified_at: null,
+          })
+          .eq("id", existingReview.id);
+      } else if (insertedReviewId) {
+        await supabase
+          .from("physician_reviews")
+          .delete()
+          .eq("id", insertedReviewId);
+      }
+
+      return {
+        success: false,
+        error: "Failed to update clinical session status to verified.",
+      };
+    }
+
+    // 6. Transition clinical_histories summary_status if record exists
+    const { data: historyRecord } = await supabase
+      .from("clinical_histories")
+      .select("id, summary_status")
+      .eq("session_id", session.id)
+      .maybeSingle();
+
+    if (historyRecord) {
+      const { error: histErr } = await supabase
+        .from("clinical_histories")
+        .update({
+          summary_status: "verified",
+          ...(editedClinicalSummary ? { ai_clinical_summary: editedClinicalSummary } : {}),
+        })
+        .eq("id", historyRecord.id);
+
+      if (histErr) {
+        console.error("Warning: Failed to update clinical_histories status", histErr.message);
+      }
+    }
+
+    // 7. Record Immutable Audit Event
+    const { error: auditErr } = await supabase.from("audit_logs").insert({
+      session_id: session.id,
+      patient_id: session.patient_id,
+      actor_type: "physician",
+      actor_id: physicianSession.physicianId,
+      event_type: "case_verified",
+      event_description: `Encounter verified and signed off by ${physicianSession.fullName}. Non-repudiation lock engaged.`,
+      metadata: {
+        physician_id: physicianSession.physicianId,
+        physician_name: physicianSession.fullName,
+        review_status: "verified_accepted",
+        is_verified: true,
+        verified_at: verifiedAt,
+        reconciliation_entries_count: reconciliationChanges?.entries?.length || 0,
+      },
+    });
+
+    if (auditErr) {
+      console.error("Warning: Failed to record audit log for verification", auditErr.message);
+    }
+
+    // 8. Return Safe Verification Result
+    return {
+      success: true,
+      sessionId: session.id,
+      reviewStatus: "verified_accepted",
+      isVerified: true,
+      verifiedBy: physicianSession.physicianId,
+      verifiedByName: physicianSession.fullName,
+      verifiedAt,
+      encounterStatus: "verified",
+    };
+  } catch (err) {
+    console.error("verifyAndSignOffEncounterAction unexpected error:", err);
+    return {
+      success: false,
+      error: "An unexpected error occurred during physician verification.",
     };
   }
 }

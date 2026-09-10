@@ -254,13 +254,101 @@ export interface PhysicianCaseDetail {
     hpiNarrative: string;
   };
   canonicalRecord?: CanonicalEncounterRecord | null;
-  physicianReview?: {
-    id: string;
-    reviewStatus: string;
-    isVerified: boolean;
-    editedClinicalSummary?: string | null;
-    physicianNotes?: string | null;
-  } | null;
+  physicianReview?: PhysicianReviewRecord | null;
+}
+
+/**
+ * Physician Verification & Sign-off Types (Phase 7)
+ * Aligned with database schema (physician_reviews, clinical_sessions, audit_logs)
+ */
+
+export type PhysicianReviewStatus =
+  | "pending"
+  | "in_review"
+  | "verified_accepted"
+  | "rejected"
+  | "amended";
+
+export type ClinicalSummaryStatus =
+  | "generated"
+  | "edited_by_physician"
+  | "verified";
+
+export type ClinicalReconciliationSection =
+  | "chief_complaint"
+  | "symptoms"
+  | "past_medical_history"
+  | "medications"
+  | "allergies"
+  | "laboratory_investigations"
+  | "documented_conditions"
+  | "triage_priority"
+  | "other";
+
+export type ClinicalReconciliationAction =
+  | "added"
+  | "modified"
+  | "removed"
+  | "confirmed";
+
+export interface ClinicalReconciliationItem {
+  section: ClinicalReconciliationSection;
+  action: ClinicalReconciliationAction;
+  itemName: string;
+  previousValue?: string | null;
+  updatedValue?: string | null;
+  reason?: string;
+}
+
+export interface PhysicianReconciliationChanges {
+  entries: ClinicalReconciliationItem[];
+  reconciliationNotes?: string;
+}
+
+export interface PhysicianReviewRecord {
+  id: string;
+  sessionId?: string;
+  patientId?: string;
+  physicianId?: string;
+  physicianName?: string;
+  reviewStatus: PhysicianReviewStatus;
+  isVerified: boolean;
+  editedClinicalSummary?: string | null;
+  physicianNotes?: string | null;
+  reconciliationChanges?: PhysicianReconciliationChanges | null;
+  verifiedAt?: string | null;
+  fhirBundleGenerated?: Record<string, unknown> | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Client input payload for submitting a physician verification / sign-off.
+ * NOTE: Does NOT accept physician identity (physicianId, physicianName) or
+ * verification timestamps from the client. Those are strictly server-controlled
+ * and extracted from the authenticated session via getActivePhysicianSession().
+ */
+export interface PhysicianVerificationPayload {
+  sessionId: string;
+  physicianNotes: string;
+  editedClinicalSummary?: string | null;
+  reconciliationChanges?: PhysicianReconciliationChanges | null;
+  confirmSignOff: boolean;
+}
+
+/**
+ * Result returned by the protected physician verification server action.
+ */
+export interface VerifyEncounterResult {
+  success: boolean;
+  error?: string;
+  sessionId?: string;
+  reviewStatus?: PhysicianReviewStatus;
+  isVerified?: boolean;
+  verifiedBy?: string | null;
+  verifiedByName?: string | null;
+  verifiedAt?: string | null;
+  encounterStatus?: SessionStatus;
 }
 
 /**

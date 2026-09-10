@@ -194,10 +194,10 @@ export default async function DoctorPatientsQueuePage() {
                         {/* Status */}
                         <td className="px-6 py-4 whitespace-nowrap text-xs">
                           {item.status === "verified" ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            <Badge variant="success" className="gap-1 font-medium shadow-2xs">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                               Verified
-                            </span>
+                            </Badge>
                           ) : isEmergency ? (
                             <span className="font-semibold text-red-700 flex items-center gap-1">
                               <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
