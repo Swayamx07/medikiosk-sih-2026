@@ -7,21 +7,47 @@
 
 # CURRENT PHASE
 
-POST-PHASE 5 CLINICAL FOUNDATIONS COMPLETE — ALL 6 CORE AREAS IMPLEMENTED & VERIFIED
+POST-PHASE 5 CLINICAL FOUNDATIONS & PHYSICIAN SECURITY HARDENING COMPLETE — PRODUCTION-READY CHECKPOINT
 
 ---
 
 # CURRENT TASK
 
-Verified All 6 Key Functional & Safety Enhancements:
-1. Physician Dashboard Access Control (Application/Routing & HMAC-SHA256 Session Cookie)
-2. Chief Complaint Quality & Validation (Non-diagnostic, multilingual, verbatim audit preserved)
-3. Document-Patient Relevance Verification (`verified`, `insufficient_info`, `mismatch`)
-4. Canonical Clinical Encounter JSON Contract (Separating patient, document, triage, & physician data)
-5. Conversational Clinical Information Structuring (Provenance-anchored symptoms, medications, allergies)
-6. Hybrid Deterministic + Gemini Fallback Architecture (Deterministic guardrails, 0 DB migrations)
-
-All 4 test suites passing (100%), TypeScript clean (0 errors), Next.js production build (`npm run build`) passing.
+Physician Security Hardening & Home UI Finalization Complete (Commit `b1b1989`):
+1. **Physician Portal Access Control & Hardening**:
+   - Cryptographic HMAC-SHA256 session token management (`src/lib/auth/physician-session.ts`).
+   - Edge-compatible route guard in `src/middleware.ts` intercepting all `/doctor/*` routes.
+   - Unauthenticated visits redirected to `/doctor/login?redirect=...`.
+   - Safe internal redirect parameter validation to prevent open-redirect vulnerabilities, defaulting to `/doctor`.
+   - Server-side `getActivePhysicianSession()` verification enforced across physician server actions (`getPhysicianQueueAction`, `getPhysicianCaseDetailAction`, `getCanonicalEncounterJsonAction`).
+   - Session invalidation on sign-out via `logoutPhysicianAction`.
+   - `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` and `Pragma: no-cache` headers on protected doctor routes preventing browser history/bfcache exposure.
+   - `SUPABASE_SERVICE_ROLE_KEY` verified server-only; never imported into client components or exposed to browser.
+2. **Clinical Functionality Intact & Preserved**:
+   - 7-step patient kiosk journey (`/patient/*`).
+   - Multilingual conversational interview in English, Hindi, and Marathi.
+   - Informed consent with timestamping and patient demographics identification (ABHA ID / demo cases).
+   - Browser voice and text intake with real-time feedback.
+   - Non-diagnostic chief complaint cleaning and multilingual semantic validation (`cleanChiefComplaint`).
+   - Document upload, MIME/size validation, and private Supabase storage persistence.
+   - Multimodal OCR clinical entity extraction (Gemini Vision + deterministic medical fallback).
+   - Document-patient relevance verification (`verified`, `insufficient_info`, `mismatch`).
+   - Provenance-anchored conversation structuring (symptoms, conditions, medications, allergies linked to kiosk step & verbatim quote).
+   - Encounter-level canonical clinical JSON contract (`CanonicalEncounterRecord`).
+   - Deterministic clinical safety and red-flag triage engine (`RULE_CARDIAC_CHEST_PAIN`).
+   - Physician queue and interactive case review with canonical JSON viewer.
+3. **Home Page UI Checkpoint**:
+   - "Start Patient Intake" remains the dominant, high-contrast primary CTA.
+   - "Attending Medical Staff Portal →" placed directly below the primary CTA (`mt-4`) as a subtle secondary text link.
+   - Portal link sits at `~450px` from document top, visible within the initial 1366×768 desktop viewport without scrolling.
+   - Trust badges (`Zero autonomous diagnosis`, `FHIR R4 Ready`) placed below the portal link.
+   - Zero modifications to clinical, security, or backend logic for this UI refinement.
+4. **All Verifications Passing**:
+   - `npm run lint` → PASS (0 errors, 0 warnings).
+   - `npx tsc --noEmit` → PASS (0 compilation errors).
+   - `npm run build` → PASS (16/16 routes generated cleanly).
+   - `npx tsx scripts/test-physician-auth.ts` → PASS (6/6 tests passed).
+   - Protected route and server action access controls verified.
 
 ---
 
@@ -74,17 +100,24 @@ All 4 test suites passing (100%), TypeScript clean (0 errors), Next.js productio
 - [x] Non-diagnostic clinical advisory banner presented to patient
 
 ### 5. Document Ingestion & Multimodal Processing (Phase 5)
-- [x] Client dropzone with MIME validation, 15 MB limit, SHA-256 checksums
+- [x] Client dropzone (`/patient/documents`) with MIME validation, 15 MB limit, SHA-256 checksums
 - [x] Server-mediated Supabase storage upload and database record creation
-- [x] Multimodal OCR and structured extraction (Gemini Vision + deterministic medical fallback)
-- [x] Extraction of lab tests, medications, diagnoses, and issuing doctor/facility metadata
+- [x] Multimodal OCR and structured extraction (`src/lib/ai/document-extractor.ts` using Gemini Vision + deterministic medical fallback)
+- [x] Extraction of lab tests, medications, conditions, and issuing doctor/facility metadata
+- [x] Persistence into `document_extractions` and `medical_timeline`
+- [x] Interactive patient upload UI with drag-and-drop, progress indicators, extraction preview, and review continuation
+- [x] Physician case-detail visibility of uploaded documents and extracted clinical findings at `/doctor/patients/[id]`
 
-### 6. Physician Dashboard Access Control (Routing & Application Guard)
+### 6. Physician Dashboard Access Control & Security Hardening
 - [x] Cryptographic HMAC-SHA256 session token management (`src/lib/auth/physician-session.ts`)
-- [x] Server-side routing interceptor in `src/middleware.ts` protecting `/doctor/:path*`
+- [x] Server-side routing interceptor in `src/middleware.ts` protecting all `/doctor/*` routes
 - [x] Unauthorized or unauthenticated direct visits blocked and redirected to `/doctor/login?redirect=...`
-- [x] Public UI links to `/doctor` purged from patient-facing components (`Navbar`, landing page)
+- [x] Safe internal redirect handling (validated against open-redirect exploits)
+- [x] Server-side session verification in physician server actions (`getPhysicianQueueAction`, `getPhysicianCaseDetailAction`, `getCanonicalEncounterJsonAction`)
+- [x] Invalidation on sign-out via `logoutPhysicianAction`
+- [x] Cache-Control: `no-store, no-cache, must-revalidate, max-age=0` and `Pragma: no-cache` to block browser history/bfcache exposure post-sign-out
 - [x] Dedicated workstation portal (`/doctor/login`) with demo credentials and automated session sign-out
+- [x] Isolated `SUPABASE_SERVICE_ROLE_KEY` to server-only execution; never exposed to browser
 - [x] Validated via `scripts/test-physician-auth.ts` (6/6 tests passed)
 
 ### 7. Chief Complaint Quality & Multilingual Semantic Validation
@@ -107,18 +140,12 @@ All 4 test suites passing (100%), TypeScript clean (0 errors), Next.js productio
 - [x] Interactive physician JSON viewer component (`CanonicalJsonViewer`) with syntax highlighting, one-click copy, and file export
 - [x] Validated via `scripts/test-canonical-json.ts` (38/38 tests passed across Demo Cases 1, 2, 3)
 
-**Objective**:
-Transform `/patient/documents` from a static UI shell into a functional, secure document ingestion step.
-
-**Scope of Work**:
-- PDF/image file validation (MIME types: `application/pdf`, `image/jpeg`, `image/png`, `image/webp`; max 15 MB).
-- Server-mediated upload to private `medical-documents` bucket using `createServerAdminClient()`.
-- Metadata persistence in `documents` table with SHA-256 checksum and processing status.
-- Server-side multimodal extraction (`src/lib/ai/document-extractor.ts`) using Gemini vision with deterministic fallback.
-- Strictly non-diagnostic structured extraction (issuing doctor/facility, date, lab values/ranges, medications, conditions).
-- Persistence into `document_extractions` and `medical_timeline`.
-- Interactive patient upload UI with drag-and-drop, progress indicators, extraction preview, and review continuation.
-- Physician case-detail visibility of uploaded documents and extracted clinical findings at `/doctor/patients/[id]`.
+### 10. Home Page Layout & Viewport Finalization
+- [x] "Start Patient Intake" maintained as dominant primary CTA
+- [x] "Attending Medical Staff Portal →" positioned directly below primary CTA (`mt-4`) as subtle secondary text link
+- [x] Portal link visible within initial 1366×768 desktop viewport without scrolling
+- [x] Trust badges (`Zero autonomous diagnosis`, `FHIR R4 Ready`) placed below the portal link
+- [x] Zero changes to clinical, security, or backend logic
 
 ---
 
@@ -126,20 +153,25 @@ Transform `/patient/documents` from a static UI shell into a functional, secure 
 
 - [x] **Lint**: `npm run lint` PASSED (0 errors, 0 warnings)
 - [x] **TypeScript**: `npx tsc --noEmit` PASSED (0 compilation errors)
-- [x] **Production Build**: `npm run build` PASSED (all 15 routes compiled cleanly)
-- [x] **Triage Engine Test Suite**: `npx tsx scripts/test-triage.ts` PASSED (8/8 tests passed):
-  - English, Hindi, and Marathi cardiac red-flag triggers
-  - Negative and insufficient combination handling
-  - Answer persistence ordering before alert generation
-  - Emergency priority escalation
-  - Idempotent duplicate alert prevention
-- [x] **Physician Queue Test Suite**: `npx tsx scripts/test-physician-queue.ts` PASSED (8/8 tests passed):
-  - Live Supabase queue fetching
-  - Priority-based sorting (emergency cases top-ranked)
-  - Queue-level triage alert and red-flag visibility
-  - Case 1 (acute cardiac), Case 2 (chronic care), and Case 3 (verified encounter) detail retrieval
-  - UUID session ID resolution
-  - Chronological Q&A and modality/language metadata
+- [x] **Production Build**: `npm run build` PASSED (16/16 routes generated cleanly)
+- [x] **Physician Auth Test Suite**: `npx tsx scripts/test-physician-auth.ts` PASSED (6/6 tests passed):
+  - Authorized physician profile existence
+  - Signed session token creation
+  - Session token cryptographic HMAC verification
+  - Tampered token rejection
+  - Corrupt payload rejection
+  - Empty / null token handling
+- [x] **Live Security & Middleware Verification**:
+  - Unauthenticated `/doctor` → 307 redirect to `/doctor/login?redirect=%2Fdoctor`
+  - Unauthenticated `/doctor/queue` → 307 redirect to `/doctor/login?redirect=%2Fdoctor%2Fqueue`
+  - Unauthenticated `/doctor/patients/...` → 307 redirect to `/doctor/login?redirect=%2Fdoctor%2Fpatients%2F...`
+  - Protected doctor routes receive `Cache-Control: no-store`
+  - Physician server actions reject unauthenticated calls with `{ success: false, error: "Unauthorized: Active physician session required." }`
+- [x] **Canonical Record Test Suite**: `npx tsx scripts/test-canonical-json.ts` PASSED (38/38 tests passed across Demo Cases 1, 2, 3)
+- [x] **Chief Complaint Validation Test Suite**: `npx tsx scripts/test-chief-complaint-validation.ts` PASSED (14/14 tests passed)
+- [x] **Document Relevance Test Suite**: `npx tsx scripts/test-document-relevance.ts` PASSED (6/6 tests passed)
+- [x] **Triage Engine Test Suite**: `npx tsx scripts/test-triage.ts` PASSED (8/8 tests passed)
+- [x] **Physician Queue Test Suite**: `npx tsx scripts/test-physician-queue.ts` PASSED (8/8 tests passed)
 
 ---
 
@@ -157,13 +189,13 @@ None.
 
 # BUILD STATUS
 
-Verified clean (`next build` passed with 15/15 routes generated; `npm run lint` passed with 0 errors).
+Verified clean (`next build` passed with 16/16 routes generated; `npm run lint` passed with 0 errors and 0 warnings).
 
 ---
 
 # DEPLOYMENT STATUS
 
-Not deployed (local Next.js development and production build verified).
+Not deployed (local Next.js development and production build verified; Git checkpoint pushed to `origin/main`).
 
 ---
 
@@ -183,22 +215,39 @@ Connected and fully migrated on Supabase (12 tables, check constraints, hardened
 
 # DEMO STATUS
 
-- Live Patient Intake Journey (Steps 1–5 and Step 7) fully functional with Supabase persistence.
+- Live Patient Intake Journey (Steps 1–7) fully functional with Supabase persistence.
 - Step 6 `/patient/interview` conversational intake with voice and Gemini/deterministic questions fully functional.
-- Step 6 `/patient/documents` is currently a UI shell (to be implemented in Phase 5).
-- Live Physician Queue (`/doctor/patients`) and Case Review (`/doctor/patients/[id]`) fully functional with live Supabase data.
+- Step 6 `/patient/documents` fully functional with drag-and-drop upload, PDF/image validation, Supabase storage persistence, multimodal OCR extraction, patient-relevance verification, and clinical review integration.
+- Live Physician Queue (`/doctor/patients`) and Case Review (`/doctor/patients/[id]`) fully functional with live Supabase data, canonical JSON viewer, and active physician session authorization.
 
 ---
 
 # LAST VERIFIED
 
-Phase 4 Deterministic Safety Triage and Checkpoint 6 Live Supabase Physician Queue verified end-to-end with automated test suites, linting, type-checking, and production build.
+Commit `b1b1989`: Physician access control hardening, server action protection, cache headers, and final home page viewport refinement verified end-to-end with automated test suites, linting (`npm run lint`), type-checking (`npx tsc --noEmit`), and production build (`npm run build`).
 
 ---
 
 # ACTIVE ROADMAP PHASE
 
-PHASE 5 — DOCUMENT INGESTION & CLINICAL DOCUMENT PROCESSING (READY TO START)
+PHASE 6 — FHIR R4 / INTEROPERABILITY (PLANNED / NOT IMPLEMENTED)
+
+**Planned Scope Only**:
+- Inspect the existing `CanonicalEncounterRecord` data contract.
+- Design a FHIR R4 mapping layer around the existing clinical record without altering clinical intake or schema.
+- Map appropriate standard FHIR R4 resources where supported by existing data:
+  - `Patient` (demographics, ABHA identifier)
+  - `Encounter` (class, status, service provider)
+  - `Condition` (chief complaint, past medical conditions, document-extracted conditions)
+  - `Observation` (symptoms, extracted lab results with values and reference ranges)
+  - `MedicationStatement` / `MedicationRequest` (patient-reported and document-extracted medications)
+  - `AllergyIntolerance` (patient-reported allergens and reactions)
+  - `DocumentReference` (uploaded medical records and checksums)
+  - `RiskAssessment` (deterministic red-flag triage findings)
+- Provide a physician-facing FHIR JSON/Bundled representation and download/export capability on `/doctor/interoperability` and case review.
+- Maintain ABDM (Ayushman Bharat Digital Mission) / Hospital Information System (HIS) integration as an architectural adapter/readiness pathway unless live integration is implemented.
+- **Explicit Boundary**: Do NOT claim live ABDM integration. Do NOT claim production FHIR interoperability until actually implemented and tested.
+- Do NOT introduce offline-first, HAPI FHIR, Redis, XGBoost, Ollama, Keycloak, or alternative technologies from outside the approved stack.
 
 ---
 
@@ -211,10 +260,33 @@ PHASE 5 — DOCUMENT INGESTION & CLINICAL DOCUMENT PROCESSING (READY TO START)
 - Do not alter database migrations or RLS policies unless explicitly required.
 - Do not expose `SUPABASE_SERVICE_ROLE_KEY` or `GEMINI_API_KEY` to the browser.
 - Do not generate medical diagnoses; document extraction must produce structured factual clinical information only.
+- Do not claim live ABDM or external EHR integration when only local adapter interfaces are defined.
 
 ---
 
 # CHANGE LOG
+
+## Checkpoint — Physician Security Hardening & Home UI Finalization (Commit b1b1989) (Completed)
+- **Physician Portal Security Hardening**:
+  - Implemented cryptographic HMAC-SHA256 session token management (`src/lib/auth/physician-session.ts`).
+  - Added Edge-compatible route guard in `src/middleware.ts` intercepting `/doctor/*` and redirecting unauthenticated requests to `/doctor/login?redirect=...`.
+  - Added safe internal redirect parameter validation to prevent open-redirect vulnerabilities, defaulting to `/doctor`.
+  - Enforced server-side `getActivePhysicianSession()` verification inside `getPhysicianQueueAction`, `getPhysicianCaseDetailAction`, and `getCanonicalEncounterJsonAction` in `src/app/actions/doctor.ts`. Unauthenticated callers receive `{ success: false, error: "Unauthorized: Active physician session required." }`.
+  - Added `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0` and `Pragma: no-cache` response headers on protected doctor routes to block browser history/bfcache exposure post-sign-out.
+  - Implemented workstation sign-out action `logoutPhysicianAction` invalidating the HttpOnly session cookie and redirecting to `/doctor/login`.
+  - Verified `SUPABASE_SERVICE_ROLE_KEY` remains strictly server-side; never imported in client components.
+- **Home Page UI Finalization**:
+  - Refined layout in `src/app/page.tsx` with compact hero vertical spacing (`py-10 sm:py-14`).
+  - "Start Patient Intake" maintained as the dominant, high-contrast primary CTA.
+  - "Attending Medical Staff Portal →" placed directly below the primary CTA (`mt-4`) as a subtle secondary text link, visible within the initial 1366×768 desktop viewport without scrolling.
+  - Trust badges (`Zero autonomous diagnosis`, `FHIR R4 Ready`) placed below the portal link.
+  - No changes to clinical, security, or backend logic.
+- **Verification & Checkpoint**:
+  - `npm run lint` PASSED (0 errors, 0 warnings).
+  - `npx tsc --noEmit` PASSED (0 errors).
+  - `npm run build` PASSED (16/16 routes generated cleanly).
+  - `scripts/test-physician-auth.ts` PASSED (6/6 tests passed).
+  - Committed and pushed to `origin/main` as commit `b1b1989`.
 
 ## Phase 5 — Pre-Implementation Document Infrastructure Inspection (Completed)
 - Inspected existing schema: verified `documents`, `document_extractions`, `medical_timeline`, and `audit_logs` tables.
