@@ -10,7 +10,6 @@ import {
   MessageSquare,
   Mic,
   FileText,
-  ShieldAlert,
   Globe,
   Stethoscope,
   Building2,
@@ -35,6 +34,7 @@ import { CanonicalJsonViewer } from "@/components/doctor/CanonicalJsonViewer";
 import { FhirBundleViewer } from "@/components/doctor/FhirBundleViewer";
 import { PhysicianHeaderVerifyButton } from "@/components/doctor/PhysicianHeaderVerifyButton";
 import { PhysicianReviewCard } from "@/components/doctor/PhysicianReviewCard";
+import { PhysicianTriageCard } from "@/components/doctor/PhysicianTriageCard";
 
 interface PatientCasePageProps {
   params: Promise<{ id: string }>;
@@ -195,46 +195,13 @@ export default async function PatientCaseDetailPage({
         </div>
       </div>
 
-      {/* Safety Alert Banner: Non-diagnostic Explainable Triage Rules */}
-      {isEmergency && caseData.triageAlerts.length > 0 && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-950 space-y-3 shadow-xs">
-          <div className="flex items-start gap-3">
-            <ShieldAlert className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-red-950">
-                  Potential Clinical Red-Flag Triggered
-                </h4>
-                <Badge variant="outline" className="text-[10px] font-mono border-red-300 text-red-800 bg-red-100/50">
-                  {caseData.triageAlerts[0].triggerRuleId}
-                </Badge>
-              </div>
-              <p className="text-xs text-red-800 leading-relaxed">
-                {caseData.triageAlerts[0].triggerReason}
-              </p>
-            </div>
-          </div>
-
-          {/* Explainable Symptoms Entities */}
-          {caseData.triageAlerts[0].triggerSymptoms &&
-            caseData.triageAlerts[0].triggerSymptoms.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap pt-1 pl-8 border-t border-red-200/80">
-                <span className="text-[11px] font-semibold text-red-900">
-                  Trigger Entities:
-                </span>
-                {caseData.triageAlerts[0].triggerSymptoms.map((sym, idx) => (
-                  <Badge
-                    key={idx}
-                    variant="outline"
-                    className="text-[10px] uppercase font-mono bg-white text-red-700 border-red-200"
-                  >
-                    {sym.replace(/_/g, " ")}
-                  </Badge>
-                ))}
-              </div>
-            )}
-        </div>
-      )}
+      {/* Clinical Safety Triage Assessment Card */}
+      <PhysicianTriageCard
+        priority={caseData.priority}
+        hasCriticalRedFlag={caseData.hasCriticalRedFlag}
+        triageAlerts={caseData.triageAlerts}
+        canonicalTriage={caseData.canonicalRecord?.triage}
+      />
 
       {/* 2-Column Clinical Review Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
