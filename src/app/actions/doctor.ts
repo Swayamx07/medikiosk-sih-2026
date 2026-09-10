@@ -28,6 +28,8 @@ import {
 } from "@/lib/clinical/canonical-record";
 import { evaluateDocumentPatientRelevance } from "@/lib/ai/document-extractor";
 import { getActivePhysicianSession } from "@/lib/auth/physician-session";
+import { mapCanonicalToFhirBundle } from "@/lib/clinical/fhir-mapper";
+import { FhirBundle } from "@/types/fhir-r4";
 
 export interface GetPhysicianQueueResult {
   success: boolean;
@@ -494,6 +496,57 @@ export async function getCanonicalEncounterJsonAction(
     return {
       success: false,
       error: err instanceof Error ? err.message : "Failed to generate canonical record",
+    };
+  }
+}
+
+export interface GetEncounterFhirBundleResult {
+  success: boolean;
+  bundle?: FhirBundle;
+  error?: string;
+}
+
+/**
+ * Retrieves the FHIR R4 Collection Bundle for an encounter.
+ * Protected server action requiring an active physician session.
+ * Reuses buildCanonicalClinicalRecord() and mapCanonicalToFhirBundle().
+ */
+export async function getEncounterFhirBundleAction(
+  sessionId: string
+): Promise<GetEncounterFhirBundleResult> {
+  try {
+    const physicianSession = await getActivePhysicianSession();
+    if (!physicianSession) {
+      return {
+        success: false,
+        error: "Unauthorized: Active physician session required.",
+      };
+    }
+
+    if (!sessionId || typeof sessionId !== "string" || !sessionId.trim()) {
+      return {
+        success: false,
+        error: "Invalid session identifier provided.",
+      };
+    }
+
+    const record = await buildCanonicalClinicalRecord(sessionId.trim());
+    if (!record) {
+      return {
+        success: false,
+        error: "Encounter not found or canonical record could not be constructed.",
+      };
+    }
+
+    const bundle = mapCanonicalToFhirBundle(record);
+    return {
+      success: true,
+      bundle,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to generate FHIR R4 bundle",
     };
   }
 }

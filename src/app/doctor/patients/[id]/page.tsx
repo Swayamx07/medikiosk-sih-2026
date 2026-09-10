@@ -34,6 +34,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { getPhysicianCaseDetailAction } from "@/app/actions/doctor";
 import { getDocumentSignedUrlAction } from "@/app/actions/documents";
 import { CanonicalJsonViewer } from "@/components/doctor/CanonicalJsonViewer";
+import { FhirBundleViewer } from "@/components/doctor/FhirBundleViewer";
 
 interface PatientCasePageProps {
   params: Promise<{ id: string }>;
@@ -162,13 +163,13 @@ export default async function PatientCaseDetailPage({
         </div>
 
         <div className="flex items-center gap-2">
-          <Link
-            href="/doctor/interoperability"
+          <a
+            href="#fhir-interoperability"
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 shadow-xs"
           >
-            <Share2 className="h-3.5 w-3.5 text-slate-600" />
-            <span>FHIR Bundle (Phase 8)</span>
-          </Link>
+            <Share2 className="h-3.5 w-3.5 text-sky-600" />
+            <span>FHIR R4 Bundle</span>
+          </a>
           <Button variant="primary" size="sm" className="gap-1.5" disabled>
             <CheckCircle2 className="h-3.5 w-3.5 text-sky-400" />
             <span>Verify &amp; Accept (Phase 7)</span>
@@ -798,6 +799,14 @@ export default async function PatientCaseDetailPage({
               record={caseData.canonicalRecord}
             />
           ) : null}
+
+          {/* FHIR R4 Interoperability Section */}
+          <section id="fhir-interoperability" aria-label="FHIR R4 Interoperability">
+            <FhirBundleViewer
+              sessionId={caseData.sessionId}
+              sessionCode={caseData.sessionCode}
+            />
+          </section>
         </div>
 
         {/* Right Column (1 Col): Demographics & Encounter Metadata */}
